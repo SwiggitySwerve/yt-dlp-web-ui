@@ -164,6 +164,7 @@ export type YtdlpVideoInfo = {
   playlist_uploader?: string;
   extractor?: string;
   extractor_key?: string;
+  is_downloaded?: boolean; // Added field
 };
 
 export type YtdlpChannelDump = {

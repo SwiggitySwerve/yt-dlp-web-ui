@@ -1,7 +1,8 @@
 import { ThemeProvider } from '@emotion/react'
 import ChevronLeft from '@mui/icons-material/ChevronLeft'
 import CloudDownloadIcon from '@mui/icons-material/CloudDownload'
-import Dashboard from '@mui/icons-material/Dashboard'
+// import Dashboard from '@mui/icons-material/Dashboard' // Changed
+import PermMediaIcon from '@mui/icons-material/PermMedia'; // Added
 import LiveTvIcon from '@mui/icons-material/LiveTv'
 import Menu from '@mui/icons-material/Menu'
 import SettingsIcon from '@mui/icons-material/Settings'
@@ -102,7 +103,7 @@ export default function Layout() {
           </Toolbar>
           <Divider />
           <List component="nav">
-            <Link to={'/'} style={
+            <Link to={'/media'} style={ // Changed to prop
               {
                 textDecoration: 'none',
                 color: mode === 'dark' ? '#ffffff' : '#000000DE'
@@ -110,9 +111,9 @@ export default function Layout() {
             }>
               <ListItemButton>
                 <ListItemIcon>
-                  <Dashboard />
+                  <PermMediaIcon /> {/* Changed Icon */}
                 </ListItemIcon>
-                <ListItemText primary={i18n.t('homeButtonLabel')} />
+                <ListItemText primary={i18n.t('mediaButtonLabel')} /> {/* Changed text */}
               </ListItemButton>
             </Link>
             {/* <Link to={'/archive'} style={

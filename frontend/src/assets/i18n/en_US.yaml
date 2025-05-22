@@ -36,7 +36,8 @@ keys:
   servedFromReverseProxyCheckbox: Is behind a reverse proxy
   urlBase: URL base, for reverse proxy support (subdir), defaults to empty
   newDownloadButton: New download
-  homeButtonLabel: Home
+  homeButtonLabel: Home # Keep for now, might be used elsewhere or for fallback
+  mediaButtonLabel: "Media" # Added
   archiveButtonLabel: Archive
   settingsButtonLabel: Settings
   rpcAuthenticationLabel: RPC authentication
@@ -97,3 +98,11 @@ keys:
   downloadVideoButtonTitle: "Download video"
   showMoreButtonLabel: "Show More"
   showLessButtonLabel: "Show Less"
+  videoAlreadyDownloaded: "Video already downloaded"
+  downloadStartedSuccess: "Download started for: {title}"
+  errorStartingDownload: "Error starting download: {message}"
+  errorMissingVideoUrl: "Cannot start download: Video URL is missing."
+  mediaPageTitle: "Media Library"
+  errorLoadingMedia: "Error loading media"
+  noMediaFound: "No media items found in your archive."
+  untitledMedia: "Untitled Media" # Added

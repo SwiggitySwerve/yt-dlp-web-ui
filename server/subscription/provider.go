@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"sync"
 
+	archiveDomain "github.com/marcopiovanello/yt-dlp-web-ui/v3/server/archive/domain" // Added import
 	"github.com/marcopiovanello/yt-dlp-web-ui/v3/server/subscription/domain"
 	"github.com/marcopiovanello/yt-dlp-web-ui/v3/server/subscription/repository"
 	"github.com/marcopiovanello/yt-dlp-web-ui/v3/server/subscription/rest"
@@ -28,9 +29,10 @@ func provideRepository(db *sql.DB) domain.Repository {
 	return repo
 }
 
-func provideService(r domain.Repository, runner task.TaskRunner) domain.Service {
+func provideService(r domain.Repository, runner task.TaskRunner, archiveRepo archiveDomain.Repository) domain.Service { // Signature changed
 	svcOnce.Do(func() {
-		svc = service.New(r, runner)
+		// Order of args for service.New: subscriptionRepo, archiveRepo, taskRunner
+		svc = service.New(r, archiveRepo, runner) // archiveRepo passed here
 	})
 	return svc
 }
