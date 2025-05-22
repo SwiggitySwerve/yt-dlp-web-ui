@@ -54,11 +54,13 @@ type AbortRequest struct {
 
 // struct representing the intent to start a download
 type DownloadRequest struct {
-	Id     string
-	URL    string   `json:"url"`
-	Path   string   `json:"path"`
-	Rename string   `json:"rename"`
-	Params []string `json:"params"`
+    URL    string   `json:"url"`
+    Params []string `json:"params"` // For raw yt-dlp params
+    Path   string   `json:"path,omitempty"`
+    Rename string   `json:"rename,omitempty"`
+    ChannelFolder string `json:"channel_folder,omitempty"`
+    PreferredFormats []string `json:"preferred_formats,omitempty"`   // New
+    PreferredQualities []string `json:"preferred_qualities,omitempty"` // New
 }
 
 // struct representing request of creating a netscape cookies file

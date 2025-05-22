@@ -180,3 +180,12 @@ export type YtdlpChannelDump = {
   extractor?: string;
   extractor_key?: string;
 };
+
+// New type for client.exec arguments, mirroring backend internal.DownloadRequest
+export type ExecRequestArgs = {
+  url: string;
+  params?: string[];
+  path?: string;         // Base path (e.g., from settings)
+  rename?: string;       // Filename template (e.g., from settings or default)
+  channel_folder?: string; // Optional sub-folder name
+};

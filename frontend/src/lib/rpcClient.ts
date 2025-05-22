@@ -5,10 +5,13 @@ import { WebSocketSubject, webSocket } from 'rxjs/webSocket'
 
 type DownloadRequestArgs = {
   url: string,
-  args: string,
+  args: string, // String of CLI style args
   pathOverride?: string,
   renameTo?: string,
-  playlist?: boolean
+  playlist?: boolean,
+  channel_folder?: string; 
+  preferred_formats?: string[];  // New
+  preferred_qualities?: string[]; // New
 }
 
 export class RPCClient {
@@ -90,25 +93,46 @@ export class RPCClient {
     )
 
     if (req.playlist) {
-      return this.sendHTTP({
-        method: 'Service.ExecPlaylist',
-        params: [{
-          URL: req.url,
-          Params: sanitizedArgs,
-          Path: req.pathOverride,
-          Rename: req.renameTo || rename,
-        }]
-      })
-    }
-    this.sendHTTP({
-      method: 'Service.Exec',
-      params: [{
-        URL: req.url.split('?list').at(0)!,
+      const playlistParamsPayload: any = {
+        URL: req.url,
         Params: sanitizedArgs,
         Path: req.pathOverride,
         Rename: req.renameTo || rename,
-      }]
-    })
+      };
+      if (req.channel_folder) {
+        playlistParamsPayload.ChannelFolder = req.channel_folder;
+      }
+      if (req.preferred_formats) { // New
+        playlistParamsPayload.PreferredFormats = req.preferred_formats;
+      }
+      if (req.preferred_qualities) { // New
+        playlistParamsPayload.PreferredQualities = req.preferred_qualities;
+      }
+      return this.sendHTTP({
+        method: 'Service.ExecPlaylist',
+        params: [playlistParamsPayload]
+      });
+    }
+    
+    const execParamsPayload: any = {
+      URL: req.url.split('?list').at(0)!,
+      Params: sanitizedArgs,
+      Path: req.pathOverride,
+      Rename: req.renameTo || rename,
+    };
+    if (req.channel_folder) {
+      execParamsPayload.ChannelFolder = req.channel_folder;
+    }
+    if (req.preferred_formats) { // New
+        execParamsPayload.PreferredFormats = req.preferred_formats;
+    }
+    if (req.preferred_qualities) { // New
+        execParamsPayload.PreferredQualities = req.preferred_qualities;
+    }
+    this.sendHTTP({
+      method: 'Service.Exec',
+      params: [execParamsPayload]
+    });
   }
 
   public formats(url: string) {

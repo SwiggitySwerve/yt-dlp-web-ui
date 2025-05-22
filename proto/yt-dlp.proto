@@ -10,9 +10,12 @@ message BaseRequest {
 message DownloadRequest {
   string id = 1;
   string url = 2;
-  string path = 3;
-  string rename = 4;
-  repeated string params = 5;
+  string path = 3;          // Base path (e.g., /app/data/downloads)
+  string rename = 4;        // Filename template (e.g., %(title)s.%(ext)s)
+  repeated string params = 5;     // Custom yt-dlp CLI params
+  string channel_folder = 6;      // Optional sub-folder name
+  repeated string preferred_formats = 7;  // New: e.g., ["mp4", "webm"]
+  repeated string preferred_qualities = 8; // New: e.g., ["1080p", "720p", "best"]
 }
 
 message ExecResponse {

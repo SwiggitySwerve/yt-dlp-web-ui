@@ -31,6 +31,13 @@ export type ThemeNarrowed = 'light' | 'dark'
 export const accents = ['default', 'red'] as const
 export type Accent = (typeof accents)[number]
 
+// Added for Download Preferences
+export type PreferenceItem = {
+  id: string; 
+  value: string; 
+  enabled: boolean;
+};
+
 export interface SettingsState {
   serverAddr: string
   serverPort: number
@@ -190,3 +197,28 @@ export const settingsState = atom<SettingsState>((get) => ({
   servedFromReverseProxy: get(servedFromReverseProxyState),
   appTitle: get(appTitleState)
 }))
+
+// --- Download Preferences Atoms ---
+
+// Default preferences - users can customize these
+const defaultFormatPreferences: PreferenceItem[] = [
+  { id: '1', value: 'mp4', enabled: true },
+  { id: '2', value: 'webm', enabled: true },
+  { id: '3', value: 'mkv', enabled: false },
+];
+
+const defaultQualityPreferences: PreferenceItem[] = [
+  { id: 'q1', value: '1080p', enabled: true },
+  { id: 'q2', value: '720p', enabled: true },
+  { id: 'q3', value: 'best', enabled: true }, // Fallback to yt-dlp's 'best'
+];
+
+export const preferredFormatsAtom = atomWithStorage<PreferenceItem[]>(
+  'preferredFormats',
+  defaultFormatPreferences
+);
+
+export const preferredQualitiesAtom = atomWithStorage<PreferenceItem[]>(
+  'preferredQualities',
+  defaultQualityPreferences
+);

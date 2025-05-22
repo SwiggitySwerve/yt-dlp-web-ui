@@ -1,30 +1,40 @@
 import React, { useState } from 'react';
 import {
   Box, Typography, Button, CircularProgress, Paper, Grid, Card, CardContent,
-  CardMedia, IconButton, Collapse // Collapse isn't used in the provided code, can remove if not needed
+  CardMedia, IconButton
 } from '@mui/material';
 import DownloadIcon from '@mui/icons-material/Download';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle'; // Added
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore'; // For show more/less
-import { YtdlpChannelDump, YtdlpVideoInfo } from '../../types'; // Adjust path as needed
+import CheckCircleIcon from '@mui/icons-material/CheckCircle'; 
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore'; 
+import { YtdlpChannelDump, YtdlpVideoInfo } from '../../types'; 
 import { useI18n } from '../../hooks/useI18n';
-import { useRPC } from '../../hooks/useRPC'; // Added
-import { useToast } from '../../hooks/toast'; // Added
-import { formatDuration, formatDate } from '../../utils'; // Assuming these utils exist or can be created
+import { useRPC } from '../../hooks/useRPC'; 
+import { useToast } from '../../hooks/toast'; 
+import { formatDuration, formatDate } from '../../utils'; 
+// Added imports for Jotai and preference atoms
+import { useAtomValue } from 'jotai';
+import { preferredFormatsAtom, preferredQualitiesAtom } from '../../atoms/settings'; // PreferenceItem not directly used here
 
 interface ChannelVideosViewProps {
   channelData: YtdlpChannelDump | null;
   onClose: () => void;
   isLoading: boolean;
+  // Optional: Pass down user-defined base path and filename template if available from settings
+  // userBasePath?: string; 
+  // userFilenameTemplate?: string;
 }
 
 const VIDEO_LIMIT_INITIAL = 5;
 
 const ChannelVideosView: React.FC<ChannelVideosViewProps> = ({ channelData, onClose, isLoading }) => {
   const { i18n } = useI18n();
-  const { client } = useRPC(); // Added
-  const { pushMessage } = useToast(); // Added
+  const { client } = useRPC(); 
+  const { pushMessage } = useToast(); 
   const [showAllVideos, setShowAllVideos] = useState(false);
+
+  // Read preference atoms
+  const preferredFormats = useAtomValue(preferredFormatsAtom);
+  const preferredQualities = useAtomValue(preferredQualitiesAtom);
 
   if (isLoading) {
     return (
@@ -35,16 +45,14 @@ const ChannelVideosView: React.FC<ChannelVideosViewProps> = ({ channelData, onCl
   }
 
   if (!channelData) {
-    return null; // Or some placeholder if needed when data is cleared but component is still mounted
+    return null; 
   }
 
-  // Sort entries by upload_date if available, otherwise use as is.
-  // yt-dlp entries for channels are often reverse chronological.
   const sortedEntries = channelData.entries ? [...channelData.entries].sort((a, b) => {
     if (a.upload_date && b.upload_date) {
-      return b.upload_date.localeCompare(a.upload_date); // Newest first
+      return b.upload_date.localeCompare(a.upload_date); 
     }
-    if (a.playlist_index && b.playlist_index) { // For playlists
+    if (a.playlist_index && b.playlist_index) { 
         return a.playlist_index - b.playlist_index;
     }
     return 0;
@@ -52,16 +60,38 @@ const ChannelVideosView: React.FC<ChannelVideosViewProps> = ({ channelData, onCl
 
   const videosToShow = showAllVideos ? sortedEntries : sortedEntries.slice(0, VIDEO_LIMIT_INITIAL);
 
-  const handleDownloadVideo = (video: YtdlpVideoInfo) => {
-    // TODO: Implement actual download logic.
+  const handleDownloadVideo = async (video: YtdlpVideoInfo) => {
     if (!video.webpage_url) {
       pushMessage(i18n.t('errorMissingVideoUrl'), 'error');
       return;
     }
+
+    let channelFolderName = "";
+    if (channelData && channelData.title) { 
+      channelFolderName = channelData.title;
+    } else if (video.uploader) { 
+      channelFolderName = video.uploader;
+    }
+    
+    channelFolderName = channelFolderName.replace(/[<>:"/\\|?*]+/g, '_').replace(/\.\./g, '_');
+    const originalFolderValue = (channelData && channelData.title) || video.uploader || "";
+    if (originalFolderValue !== "" && channelFolderName === "") { 
+        channelFolderName = "_"; 
+    }
+
+    // Extract enabled formats and qualities
+    const activeFormats = preferredFormats.filter(f => f.enabled).map(f => f.value);
+    const activeQualities = preferredQualities.filter(q => q.enabled).map(q => q.value);
+
     try {
-      // Assuming client.exec takes (url, params_array)
-      // The actual parameters might need adjustment based on rpcClient.ts definition for 'exec'
-      await client.exec(video.webpage_url, []); 
+      await client.download({
+        url: video.webpage_url!, 
+        args: "", // No raw CLI args from here for individual video download
+        channel_folder: channelFolderName || undefined, 
+        playlist: false, 
+        preferred_formats: activeFormats.length > 0 ? activeFormats : undefined,
+        preferred_qualities: activeQualities.length > 0 ? activeQualities : undefined,
+      });
       
       pushMessage(i18n.t('downloadStartedSuccess', { title: video.title }), 'success');
     } catch (error: any) {

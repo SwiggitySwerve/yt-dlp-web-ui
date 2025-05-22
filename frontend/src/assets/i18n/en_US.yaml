@@ -116,3 +116,8 @@ keys:
   durationDescSortOption: "Duration (Longest First)"
   filterByUploaderLabel: "Filter by Uploader"
   applyFiltersButtonLabel: "Apply"
+  preferredFormatsTitle: "Preferred Video Formats"
+  preferredQualitiesTitle: "Preferred Video Qualities"
+  addNewFormatLabel: "New format (e.g., mp4, bestvideo*)"
+  addNewQualityLabel: "New quality (e.g., 1080p, best)"
+  addButtonLabel: "Add"
