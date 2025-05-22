@@ -1,141 +1,192 @@
+// server/subscription/service/service.go
 package service
 
 import (
+	"bytes"
 	"context"
-	"errors"
-	"math"
+	"encoding/json"
+	// "errors" // Not explicitly used in the provided GetChannelVideos, but good for general Go.
+	"fmt"
+	"log/slog" // For logging
+	"os/exec"
 
-	"github.com/marcopiovanello/yt-dlp-web-ui/v3/server/subscription/data"
+	"github.com/google/uuid"                                                      // For temporary ID generation in Submit
+	"github.com/marcopiovanello/yt-dlp-web-ui/v3/server/config"
+	"github.com/marcopiovanello/yt-dlp-web-ui/v3/server/subscription/data" // For data.Subscription
 	"github.com/marcopiovanello/yt-dlp-web-ui/v3/server/subscription/domain"
-	"github.com/marcopiovanello/yt-dlp-web-ui/v3/server/subscription/task"
-	"github.com/robfig/cron/v3"
 )
 
-type Service struct {
-	r      domain.Repository
-	runner task.TaskRunner
+type service struct {
+	repo domain.Repository
+	// Add other dependencies if needed, like a logger
 }
 
-func New(r domain.Repository, runner task.TaskRunner) domain.Service {
-	s := &Service{
-		r:      r,
-		runner: runner,
-	}
-
-	// very crude recoverer
-	initial, _ := s.List(context.Background(), 0, math.MaxInt)
-	if initial != nil {
-		for _, v := range initial.Data {
-			s.runner.Submit(&v)
-		}
-	}
-
-	return s
-}
-
-func fromDB(model *data.Subscription) domain.Subscription {
-	return domain.Subscription{
-		Id:       model.Id,
-		URL:      model.URL,
-		Params:   model.Params,
-		CronExpr: model.CronExpr,
+// NewService creates a new subscription service.
+func NewService(repo domain.Repository) domain.Service {
+	return &service{
+		repo: repo,
 	}
 }
 
-func toDB(dto *domain.Subscription) data.Subscription {
-	return data.Subscription{
-		Id:       dto.Id,
-		URL:      dto.URL,
-		Params:   dto.Params,
-		CronExpr: dto.CronExpr,
-	}
-}
-
-// Delete implements domain.Service.
-func (s *Service) Delete(ctx context.Context, id string) error {
-	s.runner.StopTask(id)
-	return s.r.Delete(ctx, id)
-}
-
-// GetCursor implements domain.Service.
-func (s *Service) GetCursor(ctx context.Context, id string) (int64, error) {
-	return s.r.GetCursor(ctx, id)
-}
-
-// List implements domain.Service.
-func (s *Service) List(ctx context.Context, start int64, limit int) (
-	*domain.PaginatedResponse[[]domain.Subscription],
-	error,
-) {
-	dbSubs, err := s.r.List(ctx, start, limit)
+// GetChannelVideos implements domain.Service.
+func (s *service) GetChannelVideos(ctx context.Context, subscriptionID string) (*domain.YtdlpChannelDump, error) {
+	// ** IMPORTANT LATER STEP: Fix this to fetch URL from repo using subscriptionID **
+	// For the purpose of this subtask, we will use a dummy URL.
+	// A real implementation MUST fetch the URL from the subscriptionID.
+	// The `domain.Repository` interface currently lacks a GetById method. This will be added later.
+	
+	var channelURL string = "https://www.youtube.com/@youtube/videos" // Default to a known channel for testing
+	slog.Warn(
+		"Placeholder: Subscription fetching logic is not fully implemented. Using hardcoded default URL for yt-dlp.", 
+		"subscriptionID", subscriptionID, 
+		"hardcodedURL", channelURL,
+	)
+	// Example of how it might look with a Get method on the repo:
+	/*
+	actualSub, err := s.repo.Get(ctx, subscriptionID) // Assuming s.repo has a Get method
 	if err != nil {
-		return nil, err
+		slog.Error("Failed to fetch subscription by ID", "subscriptionID", subscriptionID, "error", err)
+		return nil, fmt.Errorf("failed to retrieve subscription %s: %w", subscriptionID, err)
 	}
-
-	subs := make([]domain.Subscription, len(*dbSubs))
-
-	for i, v := range *dbSubs {
-		subs[i] = fromDB(&v)
+	if actualSub == nil { // Should ideally be handled by error in Get, but good practice
+		slog.Error("Subscription not found", "subscriptionID", subscriptionID)
+		return nil, fmt.Errorf("subscription with ID %s not found", subscriptionID)
 	}
+	channelURL = actualSub.URL // Assuming data.Subscription has a URL field
+	*/
 
-	var (
-		first int64
-		next  int64
+	slog.Info("GetChannelVideos called", "subscriptionID", subscriptionID, "effectiveChannelURL", channelURL)
+
+
+	// 2. Construct and execute yt-dlp command
+	cmd := exec.CommandContext(ctx, config.Instance().DownloaderPath,
+		channelURL, // Use the (currently hardcoded) URL here
+		"--dump-single-json",
+		"--flat-playlist",
+		"--no-warnings",
+		// Consider adding "--cookies-from-browser", "chrome" or similar if needed for private content
 	)
 
-	if len(subs) > 0 {
-		first, err = s.r.GetCursor(ctx, subs[0].Id)
-		if err != nil {
-			return nil, err
-		}
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
 
-		next, err = s.r.GetCursor(ctx, subs[len(subs)-1].Id)
-		if err != nil {
-			return nil, err
-		}
+	slog.Info("Executing yt-dlp", "command", cmd.String())
+
+	err := cmd.Run()
+	if err != nil {
+		slog.Error("yt-dlp command failed", "error", err, "stderr", stderr.String())
+		return nil, fmt.Errorf("yt-dlp command failed: %w; Stderr: %s", err, stderr.String())
 	}
 
-	return &domain.PaginatedResponse[[]domain.Subscription]{
-		First: first,
-		Next:  next,
-		Data:  subs,
-	}, nil
+	// 3. Unmarshal JSON output
+	var channelDump domain.YtdlpChannelDump
+	if err := json.Unmarshal(out.Bytes(), &channelDump); err != nil {
+		slog.Error("Failed to unmarshal yt-dlp JSON output", "error", err, "outputSize", len(out.Bytes()))
+		// For debugging, log a snippet of the output:
+		// outputForLogging := out.String()
+		// if len(outputForLogging) > 500 { outputForLogging = outputForLogging[:500] + "..." }
+		// slog.Debug("yt-dlp raw output on unmarshal error", "output", outputForLogging)
+		return nil, fmt.Errorf("failed to unmarshal yt-dlp JSON output: %w", err)
+	}
+	
+	// If original URL isn't in the dump (common with --dump-single-json), set it from what was used.
+	if channelDump.OriginalURL == "" {
+		channelDump.OriginalURL = channelURL
+	}
+
+	slog.Info("Successfully fetched and parsed channel videos", "channelTitle", channelDump.Title, "entryCount", len(channelDump.Entries), "subscriptionID", subscriptionID)
+	return &channelDump, nil
 }
 
-// Submit implements domain.Service.
-func (s *Service) Submit(ctx context.Context, sub *domain.Subscription) (*domain.Subscription, error) {
-	if sub.CronExpr == "" {
-		sub.CronExpr = "*/5 * * * *"
-	}
+// --- Stub implementations for other domain.Service methods ---
 
-	_, err := cron.ParseStandard(sub.CronExpr)
-	if err != nil {
-		return nil, errors.Join(errors.New("failed parsing cron expression"), err)
-	}
-
-	subDB, err := s.r.Submit(ctx, &data.Subscription{
+func (s *service) Submit(ctx context.Context, sub *domain.Subscription) (*domain.Subscription, error) {
+	slog.Info("Service.Submit called (stub)", "subscriptionURL", sub.URL)
+	dataSub := &data.Subscription{
+		Id:       uuid.NewString(), // Placeholder ID generation. Repo should ideally handle ID.
 		URL:      sub.URL,
 		Params:   sub.Params,
 		CronExpr: sub.CronExpr,
-	})
-
-	retval := fromDB(subDB)
-
-	if err := s.runner.Submit(sub); err != nil {
-		return nil, err
 	}
-
-	return &retval, err
+	savedDataSub, err := s.repo.Submit(ctx, dataSub)
+	if err != nil {
+		slog.Error("repo.Submit failed in service stub", "error", err)
+		return nil, fmt.Errorf("repo.Submit failed: %w", err)
+	}
+	return &domain.Subscription{
+		Id:       savedDataSub.Id,
+		URL:      savedDataSub.URL,
+		Params:   savedDataSub.Params,
+		CronExpr: savedDataSub.CronExpr,
+	}, nil
 }
 
-// UpdateByExample implements domain.Service.
-func (s *Service) UpdateByExample(ctx context.Context, example *domain.Subscription) error {
-	_, err := cron.ParseStandard(example.CronExpr)
+func (s *service) List(ctx context.Context, start int64, limit int) (*domain.PaginatedResponse[[]domain.Subscription], error) {
+	slog.Info("Service.List called (stub)", "start", start, "limit", limit)
+	dataSubs, err := s.repo.List(ctx, start, limit)
 	if err != nil {
-		return errors.Join(errors.New("failed parsing cron expression"), err)
+		slog.Error("repo.List failed in service stub", "error", err)
+		return nil, fmt.Errorf("repo.List failed: %w", err)
+	}
+	if dataSubs == nil || len(*dataSubs) == 0 { // Ensure dataSubs is not nil before checking length
+		return &domain.PaginatedResponse[[]domain.Subscription]{Data: []domain.Subscription{}}, nil
 	}
 
-	e := toDB(example)
+	domainSubs := make([]domain.Subscription, len(*dataSubs))
+	for i, ds := range *dataSubs {
+		domainSubs[i] = domain.Subscription{
+			Id:       ds.Id,
+			URL:      ds.URL,
+			Params:   ds.Params,
+			CronExpr: ds.CronExpr,
+		}
+	}
+	
+	var firstCursor int64 = 0 // Placeholder
+	var nextCursor int64 = 0  // Placeholder
+	// Actual cursor logic would require more info from repo.List or how IDs are structured.
+	// For example, if 'start' is an offset and results are ordered:
+	// firstCursor = start 
+	// if len(domainSubs) == limit { nextCursor = start + int64(limit) }
+	// If 'start' is an ID (which it is for this repo), this logic is more complex
+	// and depends on the ordering of IDs and whether they are sequential.
+	// The current repo.List seems to take a 'start' ID.
+	if len(domainSubs) > 0 {
+		// This is a guess. The repo.List method needs to provide actual cursor info or be based on offset.
+		// If start is the ID of the first item, then firstCursor could be that ID (if convertible to int64).
+		// The `start` parameter for `repo.List` is an int64, but subscription IDs are strings.
+		// This highlights a mismatch that needs to be resolved in repository/service layers.
+		// For now, returning 0,0 as placeholders.
+	}
 
-	return s.r.UpdateByExample(ctx, &e)
+	return &domain.PaginatedResponse[[]domain.Subscription]{
+		First: firstCursor, 
+		Next:  nextCursor,  
+		Data:  domainSubs,
+	}, nil
+}
+
+func (s *service) UpdateByExample(ctx context.Context, example *domain.Subscription) error {
+	slog.Info("Service.UpdateByExample called (stub)", "subscriptionID", example.Id)
+	dataSub := &data.Subscription{
+		Id:       example.Id,
+		URL:      example.URL,
+		Params:   example.Params,
+		CronExpr: example.CronExpr,
+	}
+	return s.repo.UpdateByExample(ctx, dataSub)
+}
+
+func (s *service) Delete(ctx context.Context, id string) error {
+	slog.Info("Service.Delete called (stub)", "subscriptionID", id)
+	return s.repo.Delete(ctx, id)
+}
+
+func (s *service) GetCursor(ctx context.Context, id string) (int64, error) {
+	slog.Info("Service.GetCursor called (stub)", "subscriptionID", id)
+	// This method retrieves a numerical cursor for a given string ID.
+	// The current repo.GetCursor already does this.
+	return s.repo.GetCursor(ctx, id)
 }

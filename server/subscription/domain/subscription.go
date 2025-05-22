@@ -35,6 +35,7 @@ type Service interface {
 	UpdateByExample(ctx context.Context, example *Subscription) error
 	Delete(ctx context.Context, id string) error
 	GetCursor(ctx context.Context, id string) (int64, error)
+	GetChannelVideos(ctx context.Context, subscriptionID string) (*YtdlpChannelDump, error) // New method
 }
 
 type RestHandler interface {

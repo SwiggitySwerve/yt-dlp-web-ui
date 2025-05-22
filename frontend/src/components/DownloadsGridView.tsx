@@ -1,7 +1,5 @@
 import { Grid2 } from '@mui/material'
-import { useAtomValue } from 'jotai'
 import { useTransition } from 'react'
-import { activeDownloadsState } from '../atoms/downloads'
 import { useToast } from '../hooks/toast'
 import { useI18n } from '../hooks/useI18n'
 import { useRPC } from '../hooks/useRPC'
@@ -9,9 +7,11 @@ import { ProcessStatus, RPCResult } from '../types'
 import DownloadCard from './DownloadCard'
 import LoadingBackdrop from './LoadingBackdrop'
 
-const DownloadsGridView: React.FC = () => {
-  const downloads = useAtomValue(activeDownloadsState)
+interface DownloadsGridViewProps {
+  downloads: RPCResult[]
+}
 
+const DownloadsGridView: React.FC<DownloadsGridViewProps> = ({ downloads }) => {
   const { i18n } = useI18n()
   const { client } = useRPC()
   const { pushMessage } = useToast()

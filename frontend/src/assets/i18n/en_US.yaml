@@ -81,3 +81,12 @@ keys:
   editButtonLabel: 'Edit'
   newSubscriptionButton: New subscription
   clearCompletedButton: 'Clear completed'
+  noActiveDownloads: "No active downloads."
+  noPendingDownloads: "No pending downloads."
+  noCompletedDownloads: "No completed downloads in history."
+  errorLoadingHistory: "Error loading download history"
+  thumbnail: "Thumbnail"
+  title: "Title"
+  source: "Source"
+  downloadDate: "Download Date"
+  actions: "Actions"

@@ -10,10 +10,17 @@ import (
 	middlewares "github.com/marcopiovanello/yt-dlp-web-ui/v3/server/middleware"
 	"github.com/marcopiovanello/yt-dlp-web-ui/v3/server/openid"
 	"github.com/marcopiovanello/yt-dlp-web-ui/v3/server/subscription/domain"
+	"log/slog" // Added for logging
 )
 
 type RestHandler struct {
 	svc domain.Service
+}
+
+func New(svc domain.Service) domain.RestHandler { // Ensure New returns domain.RestHandler
+	return &RestHandler{
+		svc: svc,
+	}
 }
 
 // ApplyRouter implements domain.RestHandler.
@@ -31,6 +38,39 @@ func (h *RestHandler) ApplyRouter() func(chi.Router) {
 		r.Get("/", h.List())
 		r.Post("/", h.Submit())
 		r.Patch("/", h.UpdateByExample())
+		r.Get("/{id}/videos", h.GetChannelVideos()) // New route
+	}
+}
+
+// GetChannelVideos handles fetching channel videos metadata for a subscription.
+func (h *RestHandler) GetChannelVideos() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		w.Header().Set("Content-Type", "application/json")
+
+		subscriptionID := chi.URLParam(r, "id")
+		if subscriptionID == "" {
+			slog.Error("Subscription ID is missing in path")
+			http.Error(w, "Subscription ID is required", http.StatusBadRequest)
+			return
+		}
+
+		slog.Info("Handler: GetChannelVideos called", "subscriptionID", subscriptionID)
+
+		channelDump, err := h.svc.GetChannelVideos(r.Context(), subscriptionID)
+		if err != nil {
+			slog.Error("Error from GetChannelVideos service", "subscriptionID", subscriptionID, "error", err)
+			// Distinguish between "not found" and other errors if possible
+			// For now, generic internal server error.
+			http.Error(w, "Failed to get channel videos: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if err := json.NewEncoder(w).Encode(channelDump); err != nil {
+			slog.Error("Failed to encode channel videos response", "subscriptionID", subscriptionID, "error", err)
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+			return
+		}
 	}
 }
 
@@ -161,8 +201,5 @@ func (h *RestHandler) UpdateByExample() http.HandlerFunc {
 	}
 }
 
-func New(svc domain.Service) domain.RestHandler {
-	return &RestHandler{
-		svc: svc,
-	}
-}
+// Ensure New is here or that the one at the top is sufficient.
+// The diff has placed New() higher up, which is fine.

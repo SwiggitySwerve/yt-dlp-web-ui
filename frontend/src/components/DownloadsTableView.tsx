@@ -20,12 +20,15 @@ import {
 } from "@mui/material"
 import { forwardRef } from 'react'
 import { TableComponents, TableVirtuoso } from 'react-virtuoso'
-import { activeDownloadsState } from '../atoms/downloads'
 import { serverURL } from '../atoms/settings'
 import { useRPC } from '../hooks/useRPC'
 import { ProcessStatus, RPCResult } from '../types'
 import { base64URLEncode, formatSize, formatSpeedMiB } from "../utils"
 import { useAtomValue } from 'jotai'
+
+interface DownloadsTableViewProps {
+  downloads: RPCResult[]
+}
 
 const columns = [
   {
@@ -118,8 +121,7 @@ function fixedHeaderContent() {
   )
 }
 
-const DownloadsTableView: React.FC = () => {
-  const downloads = useAtomValue(activeDownloadsState)
+const DownloadsTableView: React.FC<DownloadsTableViewProps> = ({ downloads }) => {
   const serverAddr = useAtomValue(serverURL)
   const { client } = useRPC()
 

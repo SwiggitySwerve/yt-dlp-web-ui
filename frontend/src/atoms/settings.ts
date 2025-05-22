@@ -55,7 +55,7 @@ export const languageState = atomWithStorage<Language>(
 
 export const themeState = atomWithStorage<Theme>(
   'theme',
-  localStorage.getItem('theme') as Theme || 'system'
+  localStorage.getItem('theme') as Theme || 'dark'
 )
 
 export const serverAddressState = atomWithStorage<string>(
