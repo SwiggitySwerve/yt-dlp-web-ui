@@ -29,16 +29,16 @@ type Repository interface {
 	Archive(ctx context.Context, model *data.ArchiveEntry) error
 	SoftDelete(ctx context.Context, id string) (*data.ArchiveEntry, error)
 	HardDelete(ctx context.Context, id string) (*data.ArchiveEntry, error)
-	List(ctx context.Context, startRowId int, limit int) (*[]data.ArchiveEntry, error)
+	List(ctx context.Context, startRowId int, limit int, sortBy string, filterByUploader string) (*[]data.ArchiveEntry, error) // Updated
 	GetCursor(ctx context.Context, id string) (int64, error)
-	IsSourceDownloaded(ctx context.Context, sourceURL string) (bool, error) // New method
+	IsSourceDownloaded(ctx context.Context, sourceURL string) (bool, error) 
 }
 
 type Service interface {
 	Archive(ctx context.Context, entity *ArchiveEntry) error
 	SoftDelete(ctx context.Context, id string) (*ArchiveEntry, error)
 	HardDelete(ctx context.Context, id string) (*ArchiveEntry, error)
-	List(ctx context.Context, startRowId int, limit int) (*PaginatedResponse[[]ArchiveEntry], error)
+	List(ctx context.Context, startRowId int, limit int, sortBy string, filterByUploader string) (*PaginatedResponse[[]ArchiveEntry], error) // Updated
 	GetCursor(ctx context.Context, id string) (int64, error)
 }
 

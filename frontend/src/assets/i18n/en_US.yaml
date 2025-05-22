@@ -106,3 +106,13 @@ keys:
   errorLoadingMedia: "Error loading media"
   noMediaFound: "No media items found in your archive."
   untitledMedia: "Untitled Media" # Added
+  sortByLabel: "Sort By"
+  noneSortOption: "None"
+  titleAscSortOption: "Title (A-Z)"
+  titleDescSortOption: "Title (Z-A)"
+  dateAscSortOption: "Date (Oldest First)"
+  dateDescSortOption: "Date (Newest First)"
+  durationAscSortOption: "Duration (Shortest First)"
+  durationDescSortOption: "Duration (Longest First)"
+  filterByUploaderLabel: "Filter by Uploader"
+  applyFiltersButtonLabel: "Apply"

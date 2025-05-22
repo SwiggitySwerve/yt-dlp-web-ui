@@ -20,6 +20,7 @@ func New(repository domain.Repository) domain.Service {
 // Archive implements domain.Service.
 func (s *Service) Archive(ctx context.Context, entity *domain.ArchiveEntry) error {
 	return s.repository.Archive(ctx, &data.ArchiveEntry{
+		// RowId is not set here as it's DB-generated
 		Id:        entity.Id,
 		Title:     entity.Title,
 		Path:      entity.Path,
@@ -36,7 +37,9 @@ func (s *Service) HardDelete(ctx context.Context, id string) (*domain.ArchiveEnt
 	if err != nil {
 		return nil, err
 	}
-
+	if res == nil { // Handle case where entry might not be found
+		return nil, nil 
+	}
 	return &domain.ArchiveEntry{
 		Id:        res.Id,
 		Title:     res.Title,
@@ -54,7 +57,9 @@ func (s *Service) SoftDelete(ctx context.Context, id string) (*domain.ArchiveEnt
 	if err != nil {
 		return nil, err
 	}
-
+	if res == nil { // Handle case where entry might not be found
+		return nil, nil
+	}
 	return &domain.ArchiveEntry{
 		Id:        res.Id,
 		Title:     res.Title,
@@ -71,47 +76,51 @@ func (s *Service) List(
 	ctx context.Context,
 	startRowId int,
 	limit int,
+	sortBy string, 
+	filterByUploader string,
 ) (*domain.PaginatedResponse[[]domain.ArchiveEntry], error) {
-	res, err := s.repository.List(ctx, startRowId, limit)
+	// Call repository's updated List method
+	archiveEntries, err := s.repository.List(ctx, startRowId, limit, sortBy, filterByUploader)
 	if err != nil {
 		return nil, err
 	}
 
-	entities := make([]domain.ArchiveEntry, len(*res))
+	respEntries := make([]domain.ArchiveEntry, len(*archiveEntries))
+	var firstCursor, nextCursor int64
 
-	for i, model := range *res {
-		entities[i] = domain.ArchiveEntry{
-			Id:        model.Id,
-			Title:     model.Title,
-			Path:      model.Path,
-			Thumbnail: model.Thumbnail,
-			Source:    model.Source,
-			Metadata:  model.Metadata,
-			CreatedAt: model.CreatedAt,
+	if len(*archiveEntries) > 0 {
+		firstCursor = (*archiveEntries)[0].RowId // Use RowId from data.ArchiveEntry
+
+		// If the number of entries returned is equal to the limit,
+		// it's likely there are more entries. Set nextCursor to the RowId of the last entry.
+		if len(*archiveEntries) == limit {
+			nextCursor = (*archiveEntries)[len(*archiveEntries)-1].RowId
+		} else {
+			nextCursor = 0 // Or a clear indicator that there are no more pages
 		}
-	}
-
-	var (
-		first int64
-		next  int64
-	)
-
-	if len(entities) > 0 {
-		first, err = s.repository.GetCursor(ctx, entities[0].Id)
-		if err != nil {
-			return nil, err
+		
+		for i, entry := range *archiveEntries {
+			respEntries[i] = domain.ArchiveEntry{ // Map data.ArchiveEntry to domain.ArchiveEntry
+				Id:        entry.Id,
+				Title:     entry.Title,
+				Path:      entry.Path,
+				Thumbnail: entry.Thumbnail,
+				Source:    entry.Source,
+				Metadata:  entry.Metadata,
+				CreatedAt: entry.CreatedAt,
+				// RowId is not part of domain.ArchiveEntry, so not mapped here for response to client
+			}
 		}
-
-		next, err = s.repository.GetCursor(ctx, entities[len(entities)-1].Id)
-		if err != nil {
-			return nil, err
-		}
+	} else {
+		// No entries found
+		// firstCursor and nextCursor will remain 0, which is fine.
+		// Alternatively, could set firstCursor to startRowId if that's meaningful for an empty result.
 	}
 
 	return &domain.PaginatedResponse[[]domain.ArchiveEntry]{
-		First: first,
-		Next:  next,
-		Data:  entities,
+		First: firstCursor,
+		Next:  nextCursor,
+		Data:  respEntries,
 	}, nil
 }
 
