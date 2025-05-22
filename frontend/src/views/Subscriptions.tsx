@@ -6,7 +6,9 @@ import {
   Container,
   Paper,
   Table, TableBody, TableCell, TableContainer,
-  TableHead, TablePagination, TableRow
+  TableHead, TablePagination, TableRow,
+  Typography, // Added
+  Paper // Added
 } from '@mui/material'
 import { matchW } from 'fp-ts/lib/Either'
 import { pipe } from 'fp-ts/lib/function'
@@ -18,12 +20,13 @@ import NoSubscriptions from '../components/subscriptions/NoSubscriptions'
 import SubscriptionsDialog from '../components/subscriptions/SubscriptionsDialog'
 import SubscriptionsEditDialog from '../components/subscriptions/SubscriptionsEditDialog'
 import SubscriptionsSpeedDial from '../components/subscriptions/SubscriptionsSpeedDial'
+import ChannelVideosView from '../components/subscriptions/ChannelVideosView'; // Added import
 import { useToast } from '../hooks/toast'
 import useFetch from '../hooks/useFetch'
 import { useI18n } from '../hooks/useI18n'
 import { ffetch } from '../lib/httpClient'
 import { Subscription } from '../services/subscriptions'
-import { PaginatedResponse } from '../types'
+import { PaginatedResponse, YtdlpChannelDump } from '../types' // Added YtdlpChannelDump
 
 const SubscriptionsView: React.FC = () => {
   const { i18n } = useI18n()
@@ -38,11 +41,40 @@ const SubscriptionsView: React.FC = () => {
   const [limit, setLimit] = useState(9)
   const [page, setPage] = useState(0)
 
+  // State for viewing channel videos
+  const [viewingSubscriptionId, setViewingSubscriptionId] = useState<string | null>(null);
+  const [channelVideosData, setChannelVideosData] = useState<YtdlpChannelDump | null>(null);
+  const [isLoadingChannelVideos, setIsLoadingChannelVideos] = useState<boolean>(false);
+
   const { data: subs, fetcher: refecth } = useFetch<PaginatedResponse<Subscription[]>>(
     `/subscriptions?id=${startId}&limit=${limit}`
   )
 
   const [isPending, startTransition] = useTransition()
+
+  const handleViewVideos = async (id: string) => {
+    setViewingSubscriptionId(id);
+    setIsLoadingChannelVideos(true);
+    setChannelVideosData(null); // Clear previous data
+
+    const task = ffetch<YtdlpChannelDump>(`${baseURL}/subscriptions/${id}/videos`);
+    const either = await task();
+
+    pipe(
+      either,
+      matchW(
+        (error) => {
+          pushMessage(`Error fetching channel videos: ${error.message || error}`, 'error');
+          setIsLoadingChannelVideos(false);
+          setViewingSubscriptionId(null); // Clear on error
+        },
+        (data) => {
+          setChannelVideosData(data);
+          setIsLoadingChannelVideos(false);
+        }
+      )
+    );
+  };
 
   const deleteSubscription = async (id: string) => {
     const task = ffetch<void>(`${baseURL}/subscriptions/${id}`, {
@@ -125,12 +157,34 @@ const SubscriptionsView: React.FC = () => {
                         >
                           <DeleteIcon />
                         </Button>
+                        <Button
+                          variant='outlined'
+                          size='small'
+                          sx={{ ml: 0.5 }} // Use ml for margin-left if it's to the right of delete
+                          onClick={() => handleViewVideos(x.id)}
+                        >
+                          View Videos
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </TableContainer>
+
+            {/* Display area for channel videos - Replaced with ChannelVideosView */}
+            {viewingSubscriptionId && (
+              <ChannelVideosView
+                isLoading={isLoadingChannelVideos}
+                channelData={channelVideosData}
+                onClose={() => {
+                  setViewingSubscriptionId(null);
+                  setChannelVideosData(null);
+                }}
+              />
+            )}
+            {/* End display area */}
+
             <TablePagination
               component="div"
               count={-1}
@@ -149,7 +203,8 @@ const SubscriptionsView: React.FC = () => {
               onRowsPerPageChange={(e) => { setLimit(parseInt(e.target.value)) }}
             />
           </Paper>
-        </Container>}
+        </Container>
+      }
     </>
   )
 }

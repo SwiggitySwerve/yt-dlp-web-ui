@@ -24,6 +24,7 @@ type PaginatedResponse[T any] struct {
 type Repository interface {
 	Submit(ctx context.Context, sub *data.Subscription) (*data.Subscription, error)
 	List(ctx context.Context, start int64, limit int) (*[]data.Subscription, error)
+	Get(ctx context.Context, id string) (*data.Subscription, error) // New method
 	UpdateByExample(ctx context.Context, example *data.Subscription) error
 	Delete(ctx context.Context, id string) error
 	GetCursor(ctx context.Context, id string) (int64, error)

@@ -31,6 +31,7 @@ type Repository interface {
 	HardDelete(ctx context.Context, id string) (*data.ArchiveEntry, error)
 	List(ctx context.Context, startRowId int, limit int) (*[]data.ArchiveEntry, error)
 	GetCursor(ctx context.Context, id string) (int64, error)
+	IsSourceDownloaded(ctx context.Context, sourceURL string) (bool, error) // New method
 }
 
 type Service interface {

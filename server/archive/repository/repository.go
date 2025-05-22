@@ -154,3 +154,21 @@ func (r *Repository) GetCursor(ctx context.Context, id string) (int64, error) {
 
 	return rowId, nil
 }
+
+// IsSourceDownloaded implements domain.Repository.
+func (r *Repository) IsSourceDownloaded(ctx context.Context, sourceURL string) (bool, error) {
+	conn, err := r.db.Conn(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer conn.Close()
+
+	var exists bool
+	query := "SELECT EXISTS(SELECT 1 FROM archive WHERE source = ? LIMIT 1)"
+	err = conn.QueryRowContext(ctx, query, sourceURL).Scan(&exists)
+	if err != nil {
+		// sql.ErrNoRows should not occur with SELECT EXISTS, but other errors might.
+		return false, err
+	}
+	return exists, nil
+}

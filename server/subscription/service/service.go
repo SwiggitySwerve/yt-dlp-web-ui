@@ -4,67 +4,65 @@ package service
 import (
 	"bytes"
 	"context"
+	"database/sql" // Required for sql.ErrNoRows
 	"encoding/json"
-	// "errors" // Not explicitly used in the provided GetChannelVideos, but good for general Go.
+	"errors" // Keep if used by other stubs or for errors.Is
 	"fmt"
 	"log/slog" // For logging
 	"os/exec"
 
-	"github.com/google/uuid"                                                      // For temporary ID generation in Submit
+	"github.com/google/uuid"                                                      // For temporary ID generation in Submit (used in stub)
+	archiveDomain "github.com/marcopiovanello/yt-dlp-web-ui/v3/server/archive/domain" 
 	"github.com/marcopiovanello/yt-dlp-web-ui/v3/server/config"
 	"github.com/marcopiovanello/yt-dlp-web-ui/v3/server/subscription/data" // For data.Subscription
 	"github.com/marcopiovanello/yt-dlp-web-ui/v3/server/subscription/domain"
+	"github.com/marcopiovanello/yt-dlp-web-ui/v3/server/subscription/task" // Added task import
 )
 
 type service struct {
-	repo domain.Repository
+	repo          domain.Repository // This is subscriptionDomain.Repository
+	archiveRepo   archiveDomain.Repository
+	runner        task.TaskRunner // Added
 	// Add other dependencies if needed, like a logger
 }
 
 // NewService creates a new subscription service.
-func NewService(repo domain.Repository) domain.Service {
+func NewService(repo domain.Repository, archiveRepo archiveDomain.Repository, runner task.TaskRunner) domain.Service { // Added runner
 	return &service{
-		repo: repo,
+		repo:        repo,
+		archiveRepo: archiveRepo,
+		runner:      runner, // Added
 	}
 }
 
 // GetChannelVideos implements domain.Service.
 func (s *service) GetChannelVideos(ctx context.Context, subscriptionID string) (*domain.YtdlpChannelDump, error) {
-	// ** IMPORTANT LATER STEP: Fix this to fetch URL from repo using subscriptionID **
-	// For the purpose of this subtask, we will use a dummy URL.
-	// A real implementation MUST fetch the URL from the subscriptionID.
-	// The `domain.Repository` interface currently lacks a GetById method. This will be added later.
-	
-	var channelURL string = "https://www.youtube.com/@youtube/videos" // Default to a known channel for testing
-	slog.Warn(
-		"Placeholder: Subscription fetching logic is not fully implemented. Using hardcoded default URL for yt-dlp.", 
-		"subscriptionID", subscriptionID, 
-		"hardcodedURL", channelURL,
-	)
-	// Example of how it might look with a Get method on the repo:
-	/*
-	actualSub, err := s.repo.Get(ctx, subscriptionID) // Assuming s.repo has a Get method
+	slog.Info("Fetching subscription details", "subscriptionID", subscriptionID)
+	subData, err := s.repo.Get(ctx, subscriptionID) // Use the new Get method
+
 	if err != nil {
-		slog.Error("Failed to fetch subscription by ID", "subscriptionID", subscriptionID, "error", err)
-		return nil, fmt.Errorf("failed to retrieve subscription %s: %w", subscriptionID, err)
+		// Check if it's a 'not found' error specifically if your repo.Get returns sql.ErrNoRows
+		if errors.Is(err, sql.ErrNoRows) {
+			slog.Warn("Subscription not found (sql.ErrNoRows)", "subscriptionID", subscriptionID, "error", err)
+			return nil, fmt.Errorf("subscription with ID %s not found: %w", subscriptionID, err)
+		}
+		slog.Error("Failed to get subscription from repository", "subscriptionID", subscriptionID, "error", err)
+		return nil, fmt.Errorf("failed to get subscription %s: %w", subscriptionID, err)
 	}
-	if actualSub == nil { // Should ideally be handled by error in Get, but good practice
-		slog.Error("Subscription not found", "subscriptionID", subscriptionID)
-		return nil, fmt.Errorf("subscription with ID %s not found", subscriptionID)
+	if subData == nil { // If repo.Get returns (nil, nil) for not found (as implemented)
+		slog.Warn("Subscription not found (repo returned nil data and nil error)", "subscriptionID", subscriptionID)
+		// This specific error message helps distinguish from the sql.ErrNoRows case if both are possible.
+		return nil, fmt.Errorf("subscription with ID %s not found (data was nil)", subscriptionID)
 	}
-	channelURL = actualSub.URL // Assuming data.Subscription has a URL field
-	*/
 
-	slog.Info("GetChannelVideos called", "subscriptionID", subscriptionID, "effectiveChannelURL", channelURL)
+	channelURL := subData.URL
+	slog.Info("Subscription found, proceeding to fetch channel videos", "subscriptionID", subscriptionID, "channelURL", channelURL)
 
-
-	// 2. Construct and execute yt-dlp command
 	cmd := exec.CommandContext(ctx, config.Instance().DownloaderPath,
-		channelURL, // Use the (currently hardcoded) URL here
+		channelURL,
 		"--dump-single-json",
 		"--flat-playlist",
 		"--no-warnings",
-		// Consider adding "--cookies-from-browser", "chrome" or similar if needed for private content
 	)
 
 	var out bytes.Buffer
@@ -74,47 +72,66 @@ func (s *service) GetChannelVideos(ctx context.Context, subscriptionID string) (
 
 	slog.Info("Executing yt-dlp", "command", cmd.String())
 
-	err := cmd.Run()
-	if err != nil {
-		slog.Error("yt-dlp command failed", "error", err, "stderr", stderr.String())
-		return nil, fmt.Errorf("yt-dlp command failed: %w; Stderr: %s", err, stderr.String())
+	runErr := cmd.Run() // Changed variable name to avoid conflict with 'err' from repo.Get
+	if runErr != nil {
+		slog.Error("yt-dlp command failed", "error", runErr, "stderr", stderr.String())
+		return nil, fmt.Errorf("yt-dlp command failed: %w; Stderr: %s", runErr, stderr.String())
 	}
 
-	// 3. Unmarshal JSON output
 	var channelDump domain.YtdlpChannelDump
-	if err := json.Unmarshal(out.Bytes(), &channelDump); err != nil {
-		slog.Error("Failed to unmarshal yt-dlp JSON output", "error", err, "outputSize", len(out.Bytes()))
-		// For debugging, log a snippet of the output:
-		// outputForLogging := out.String()
-		// if len(outputForLogging) > 500 { outputForLogging = outputForLogging[:500] + "..." }
-		// slog.Debug("yt-dlp raw output on unmarshal error", "output", outputForLogging)
-		return nil, fmt.Errorf("failed to unmarshal yt-dlp JSON output: %w", err)
+	if unmarshalErr := json.Unmarshal(out.Bytes(), &channelDump); unmarshalErr != nil { // Changed variable name
+		slog.Error("Failed to unmarshal yt-dlp JSON output", "error", unmarshalErr, "outputSize", len(out.Bytes()))
+		return nil, fmt.Errorf("failed to unmarshal yt-dlp JSON output: %w", unmarshalErr)
 	}
-	
-	// If original URL isn't in the dump (common with --dump-single-json), set it from what was used.
+
 	if channelDump.OriginalURL == "" {
 		channelDump.OriginalURL = channelURL
 	}
+	if channelDump.ID == "" { 
+		channelDump.ID = subData.Id 
+	}
 
-	slog.Info("Successfully fetched and parsed channel videos", "channelTitle", channelDump.Title, "entryCount", len(channelDump.Entries), "subscriptionID", subscriptionID)
+	// Check download status for each video
+	for i := range channelDump.Entries {
+		video := &channelDump.Entries[i] // Use pointer to modify in place
+		if video.WebpageURL != "" { // Ensure there's a URL to check
+			isDownloaded, checkErr := s.archiveRepo.IsSourceDownloaded(ctx, video.WebpageURL)
+			if checkErr != nil {
+				slog.Error("Failed to check if video is downloaded from archive", "videoURL", video.WebpageURL, "error", checkErr)
+				video.IsDownloaded = false // Default to false on error
+			} else {
+				video.IsDownloaded = isDownloaded
+			}
+		} else {
+			video.IsDownloaded = false // No URL to check
+		}
+	}
+
+	slog.Info("Successfully fetched and parsed channel videos, and checked download status", "channelTitle", channelDump.Title, "entryCount", len(channelDump.Entries))
 	return &channelDump, nil
 }
 
-// --- Stub implementations for other domain.Service methods ---
+// --- Stub implementations for other domain.Service methods (as provided in prompt) ---
 
 func (s *service) Submit(ctx context.Context, sub *domain.Subscription) (*domain.Subscription, error) {
 	slog.Info("Service.Submit called (stub)", "subscriptionURL", sub.URL)
 	dataSub := &data.Subscription{
-		Id:       uuid.NewString(), // Placeholder ID generation. Repo should ideally handle ID.
 		URL:      sub.URL,
 		Params:   sub.Params,
 		CronExpr: sub.CronExpr,
 	}
-	savedDataSub, err := s.repo.Submit(ctx, dataSub)
+	if sub.Id == "" {
+		dataSub.Id = uuid.NewString() 
+	} else {
+		dataSub.Id = sub.Id
+	}
+
+	savedDataSub, err := s.repo.Submit(ctx, dataSub) 
 	if err != nil {
 		slog.Error("repo.Submit failed in service stub", "error", err)
 		return nil, fmt.Errorf("repo.Submit failed: %w", err)
 	}
+
 	return &domain.Subscription{
 		Id:       savedDataSub.Id,
 		URL:      savedDataSub.URL,
@@ -130,7 +147,7 @@ func (s *service) List(ctx context.Context, start int64, limit int) (*domain.Pag
 		slog.Error("repo.List failed in service stub", "error", err)
 		return nil, fmt.Errorf("repo.List failed: %w", err)
 	}
-	if dataSubs == nil || len(*dataSubs) == 0 { // Ensure dataSubs is not nil before checking length
+	if dataSubs == nil || len(*dataSubs) == 0 {
 		return &domain.PaginatedResponse[[]domain.Subscription]{Data: []domain.Subscription{}}, nil
 	}
 
@@ -143,27 +160,13 @@ func (s *service) List(ctx context.Context, start int64, limit int) (*domain.Pag
 			CronExpr: ds.CronExpr,
 		}
 	}
-	
-	var firstCursor int64 = 0 // Placeholder
-	var nextCursor int64 = 0  // Placeholder
-	// Actual cursor logic would require more info from repo.List or how IDs are structured.
-	// For example, if 'start' is an offset and results are ordered:
-	// firstCursor = start 
-	// if len(domainSubs) == limit { nextCursor = start + int64(limit) }
-	// If 'start' is an ID (which it is for this repo), this logic is more complex
-	// and depends on the ordering of IDs and whether they are sequential.
-	// The current repo.List seems to take a 'start' ID.
-	if len(domainSubs) > 0 {
-		// This is a guess. The repo.List method needs to provide actual cursor info or be based on offset.
-		// If start is the ID of the first item, then firstCursor could be that ID (if convertible to int64).
-		// The `start` parameter for `repo.List` is an int64, but subscription IDs are strings.
-		// This highlights a mismatch that needs to be resolved in repository/service layers.
-		// For now, returning 0,0 as placeholders.
-	}
 
+	var firstCursor int64 = 0 
+	var nextCursor int64 = 0  
+	
 	return &domain.PaginatedResponse[[]domain.Subscription]{
-		First: firstCursor, 
-		Next:  nextCursor,  
+		First: firstCursor,
+		Next:  nextCursor,
 		Data:  domainSubs,
 	}, nil
 }
@@ -186,7 +189,5 @@ func (s *service) Delete(ctx context.Context, id string) error {
 
 func (s *service) GetCursor(ctx context.Context, id string) (int64, error) {
 	slog.Info("Service.GetCursor called (stub)", "subscriptionID", id)
-	// This method retrieves a numerical cursor for a given string ID.
-	// The current repo.GetCursor already does this.
 	return s.repo.GetCursor(ctx, id)
 }

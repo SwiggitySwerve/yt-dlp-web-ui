@@ -90,3 +90,10 @@ keys:
   source: "Source"
   downloadDate: "Download Date"
   actions: "Actions"
+  channelVideosTitle: "Channel Videos" # Fallback title
+  closeButtonLabel: "Close"
+  noVideosFoundInChannel: "No videos found for this channel/playlist."
+  untitledVideo: "Untitled Video"
+  downloadVideoButtonTitle: "Download video"
+  showMoreButtonLabel: "Show More"
+  showLessButtonLabel: "Show Less"

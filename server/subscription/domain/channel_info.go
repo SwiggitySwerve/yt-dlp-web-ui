@@ -30,6 +30,7 @@ type YtdlpVideoInfo struct {
 	PlaylistUploader string `json:"playlist_uploader,omitempty"`
 	Extractor       string `json:"extractor,omitempty"` // e.g., "youtube"
 	ExtractorKey    string `json:"extractor_key,omitempty"` // e.g., "Youtube"
+	IsDownloaded  bool   `json:"is_downloaded"` // New field
 }
 
 // YtdlpChannelDump represents the overall JSON structure when dumping a channel/playlist.

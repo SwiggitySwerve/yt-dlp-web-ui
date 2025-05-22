@@ -140,3 +140,42 @@ export type PaginatedResponse<T> = {
   next: number
   data: T
 }
+
+// Added for Subscription Channel Videos Feature
+export type YtdlpVideoInfo = {
+  id: string;
+  title: string;
+  description?: string;
+  thumbnail?: string;
+  // thumbnails?: Array<{ url: string; height?: number; width?: number; resolution?: string; id?: string; }>;
+  duration?: number; // seconds
+  webpage_url?: string;
+  uploader?: string;
+  uploader_id?: string;
+  uploader_url?: string;
+  upload_date?: string; // YYYYMMDD
+  view_count?: number;
+  like_count?: number;
+  average_rating?: number;
+  is_live?: boolean;
+  playlist_index?: number;
+  playlist_id?: string;
+  playlist_title?: string;
+  playlist_uploader?: string;
+  extractor?: string;
+  extractor_key?: string;
+};
+
+export type YtdlpChannelDump = {
+  entries?: YtdlpVideoInfo[];
+  id: string; // Channel/Playlist ID
+  title: string; // Channel/Playlist Title
+  uploader?: string;
+  uploader_id?: string;
+  uploader_url?: string;
+  description?: string;
+  webpage_url?: string;
+  original_url?: string; // URL passed to yt-dlp
+  extractor?: string;
+  extractor_key?: string;
+};
