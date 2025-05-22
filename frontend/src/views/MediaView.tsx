@@ -1,16 +1,14 @@
-import React, { useEffect, useState } from 'react'; // Ensure React is imported
+import React, { useEffect, useState } from 'react'; 
 import { useAtomValue } from 'jotai';
 import { serverURL } from '../atoms/settings'; 
 import useFetch from '../hooks/useFetch';
 import { ArchiveEntry, PaginatedResponse } from '../types'; 
-// Updated imports for MUI controls
 import { Container, Grid, Typography, CircularProgress, Box, TablePagination, Select, MenuItem, FormControl, InputLabel, TextField, Button } from '@mui/material';
 import { useI18n } from '../hooks/useI18n';
 import MediaCard from '../components/media/MediaCard'; 
 
 export default function MediaView() {
   const { i18n } = useI18n();
-  // const baseURL = useAtomValue(serverURL); // Not directly used if useFetch handles base URL
 
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10); 
@@ -19,8 +17,12 @@ export default function MediaView() {
   // State for Sort/Filter values
   const [sortOption, setSortOption] = useState('');
   const [filterUploader, setFilterUploader] = useState('');
+  const [filterFormat, setFilterFormat] = useState(''); 
+  const [filterMinDuration, setFilterMinDuration] = useState(''); 
+  const [filterMaxDuration, setFilterMaxDuration] = useState(''); 
+  const [searchQuery, setSearchQuery] = useState(''); // Step 1: Add State Variable
 
-  // 1. Update useFetch URL construction
+  // Update useFetch URL Construction
   const queryParams = new URLSearchParams();
   queryParams.append('id', String(startId));
   queryParams.append('limit', String(rowsPerPage));
@@ -30,36 +32,41 @@ export default function MediaView() {
   if (filterUploader) {
     queryParams.append('filter_uploader', filterUploader);
   }
+  if (filterFormat) {
+    queryParams.append('filter_format', filterFormat);
+  }
+  if (filterMinDuration) {
+    queryParams.append('filter_min_duration', filterMinDuration);
+  }
+  if (filterMaxDuration) {
+    queryParams.append('filter_max_duration', filterMaxDuration);
+  }
+  if (searchQuery) { // Step 3: Add search_query to URL
+    queryParams.append('search_query', searchQuery);
+  }
 
   const { data: archiveData, isLoading, error, fetcher } = useFetch<PaginatedResponse<ArchiveEntry[]>>(
     `/archive?${queryParams.toString()}`
   );
 
-  // 3. Update useEffect for fetcher
+  // Update useEffect for fetcher
   useEffect(() => {
-    console.log("MediaView: Fetching archive data due to dependency change.", { startId, rowsPerPage, sortOption, filterUploader });
+    console.log("MediaView: Fetching archive data due to dependency change.", { 
+        startId, rowsPerPage, sortOption, filterUploader, 
+        filterFormat, filterMinDuration, filterMaxDuration, searchQuery // Added searchQuery
+    });
     fetcher();
-  }, [startId, rowsPerPage, sortOption, filterUploader, fetcher]); // Added sortOption, filterUploader
+  }, [startId, rowsPerPage, sortOption, filterUploader, filterFormat, filterMinDuration, filterMaxDuration, searchQuery, fetcher]); // Step 4: Add searchQuery to deps
 
   const handleChangePage = (event: unknown, newPage: number) => {
     console.log("MediaView: handleChangePage", { newPage, currentPage: page });
     if (archiveData) {
       if (newPage > page && archiveData.next !== 0) {
         setStartId(archiveData.next);
-      } else if (newPage < page && archiveData.first !== startId) { // Avoid re-fetching same page if 'first' is current startId
-        // This logic for 'previous' needs to be robust if API provides 'prev_cursor' or similar.
-        // For now, using 'first' might take you to the beginning of the current set or the absolute first page.
-        // If your API's 'first' cursor means "ID of the first item in the current list", 
-        // then to go "back" you'd need a different mechanism or for startId to be 0.
-        // Setting to 0 often means "fetch the very first page".
-        // For now, let's assume going back means resetting to the first page of the current filter/sort.
-        // This part may need server-side support for true previous page cursors.
-        // A simple approach for "previous" might just be to set startId to 0 if newPage is 0.
+      } else if (newPage < page && archiveData.first !== startId) {
         if (newPage === 0) {
             setStartId(0);
         } else {
-            // Complex "previous" logic with cursors is hard without API support.
-            // For now, this might re-fetch from 'archiveData.first' or do nothing if it's the same.
             setStartId(archiveData.first); 
         }
       }
@@ -104,7 +111,25 @@ export default function MediaView() {
         {i18n.t('mediaPageTitle')}
       </Typography>
       
+      {/* Filter and Sort Controls Box */}
       <Box mb={3} display="flex" gap={2} alignItems="center" flexWrap="wrap">
+        {/* Step 2: Add Search Bar UI Element */}
+        <TextField
+          label={i18n.t('searchMediaLabel')}
+          variant="outlined"
+          size="small"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                  console.log("MediaView: Search on Enter:", searchQuery);
+                  setPage(0); 
+                  setStartId(0);
+              }
+          }}
+          sx={{ width: { xs: '100%', sm: 250, md: 300 }, mr: {sm: 'auto'} }} // Takes more space on xs, specific width on sm+
+        />
+
         <FormControl sx={{ minWidth: 180 }} size="small">
           <InputLabel id="sort-by-label">{i18n.t('sortByLabel')}</InputLabel>
           <Select
@@ -112,12 +137,7 @@ export default function MediaView() {
             label={i18n.t('sortByLabel')}
             value={sortOption}
             onChange={(e) => {
-              console.log("MediaView: Sort option changed", { newSortOption: e.target.value });
               setSortOption(e.target.value);
-              // Optional: Apply immediately or wait for "Apply" button
-              // If applying immediately:
-              // setPage(0);
-              // setStartId(0);
             }}
           >
             <MenuItem value="">{i18n.t('noneSortOption')}</MenuItem>
@@ -136,20 +156,56 @@ export default function MediaView() {
           size="small"
           value={filterUploader}
           onChange={(e) => {
-            console.log("MediaView: Filter uploader changed", { newFilterUploader: e.target.value });
             setFilterUploader(e.target.value);
-            // Optional: Apply immediately or wait for "Apply" button
           }}
           sx={{ minWidth: 200 }}
         />
+
+        <FormControl sx={{ minWidth: 150 }} size="small">
+          <InputLabel id="filter-format-label">{i18n.t('filterByFormatLabel')}</InputLabel>
+          <Select
+            labelId="filter-format-label"
+            label={i18n.t('filterByFormatLabel')}
+            value={filterFormat}
+            onChange={(e) => setFilterFormat(e.target.value)}
+          >
+            <MenuItem value="">{i18n.t('allFormatsOption')}</MenuItem>
+            <MenuItem value="mp4">MP4</MenuItem>
+            <MenuItem value="webm">WEBM</MenuItem>
+            <MenuItem value="mkv">MKV</MenuItem>
+          </Select>
+        </FormControl>
+
+        <TextField
+          label={i18n.t('filterMinDurationLabel')}
+          variant="outlined"
+          size="small"
+          type="number"
+          value={filterMinDuration}
+          onChange={(e) => setFilterMinDuration(e.target.value)}
+          sx={{ width: 180 }}
+          InputProps={{ inputProps: { min: 0 } }}
+        />
+
+        <TextField
+          label={i18n.t('filterMaxDurationLabel')}
+          variant="outlined"
+          size="small"
+          type="number"
+          value={filterMaxDuration}
+          onChange={(e) => setFilterMaxDuration(e.target.value)}
+          sx={{ width: 180 }}
+          InputProps={{ inputProps: { min: 0 } }}
+        />
         
-        {/* 2. Update "Apply" Button's onClick handler */}
         <Button variant="contained" onClick={() => {
-            console.log("MediaView: Apply Filters/Sort Clicked", { sortOption, filterUploader, currentPage: page, currentStartId: startId });
+            console.log("MediaView: Apply Filters/Sort Clicked", { 
+                sortOption, filterUploader, filterFormat, 
+                filterMinDuration, filterMaxDuration, searchQuery, // Step 5: Update console.log
+                currentPage: page, currentStartId: startId 
+            });
             setPage(0); 
             setStartId(0); 
-            // The useEffect will now trigger the fetch due to sortOption/filterUploader being in its deps,
-            // and startId/page being reset.
           }}>
           {i18n.t('applyFiltersButtonLabel')}
         </Button>
@@ -164,7 +220,7 @@ export default function MediaView() {
       </Grid>
       <TablePagination
         component="div"
-        count={-1} // API doesn't give total count
+        count={-1} 
         rowsPerPageOptions={[10, 25, 50, 100]} 
         rowsPerPage={rowsPerPage}
         page={page}

@@ -121,3 +121,8 @@ keys:
   addNewFormatLabel: "New format (e.g., mp4, bestvideo*)"
   addNewQualityLabel: "New quality (e.g., 1080p, best)"
   addButtonLabel: "Add"
+  filterByFormatLabel: "Filter by Format"
+  allFormatsOption: "All Formats"
+  filterMinDurationLabel: "Min Duration (sec)"
+  filterMaxDurationLabel: "Max Duration (sec)"
+  searchMediaLabel: "Search Media" # Added

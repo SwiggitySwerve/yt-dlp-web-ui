@@ -269,14 +269,16 @@ func (p *Process) Complete() {
 	if p.Progress.Percentage == "" && p.Progress.Speed == 0 {
 		var serializedMetadata bytes.Buffer
 		json.NewEncoder(&serializedMetadata).Encode(p.Info)
-		archiver.Publish(&archiver.Message{
+		archiver.Publish(&archiver.Message{ // archiver.Message is an alias for archive.Entity (data.ArchiveEntry)
 			Id:        p.Id,
 			Path:      p.Output.SavedFilePath,
 			Title:     p.Info.Title,
 			Thumbnail: p.Info.Thumbnail,
-			Source:    p.Url,
+			Source:    p.Info.URL, // Using p.Info.URL (webpage_url from yt-dlp)
 			Metadata:  serializedMetadata.String(),
-			CreatedAt: p.Info.CreatedAt,
+			CreatedAt: p.Info.CreatedAt, // This is when metadata was fetched
+			Duration:  int64(p.Info.Duration), // New
+			Format:    p.Info.Ext,             // New
 		})
 	}
 	p.Progress = DownloadProgress{
