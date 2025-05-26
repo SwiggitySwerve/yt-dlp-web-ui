@@ -2,17 +2,22 @@ import React, { useEffect, useState } from 'react';
 import { useAtomValue } from 'jotai';
 import { serverURL } from '../atoms/settings'; 
 import useFetch from '../hooks/useFetch';
-import { ArchiveEntry, PaginatedResponse } from '../types'; 
+import { ArchiveEntry, PaginatedResponse } from '../types';
 import { Container, Grid, Typography, CircularProgress, Box, TablePagination, Select, MenuItem, FormControl, InputLabel, TextField, Button } from '@mui/material';
 import { useI18n } from '../hooks/useI18n';
-import MediaCard from '../components/media/MediaCard'; 
+import MediaCard from '../components/media/MediaCard';
+import MediaDetailModal from '../components/media/MediaDetailModal'; // Import MediaDetailModal
 
 export default function MediaView() {
   const { i18n } = useI18n();
 
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10); 
-  const [startId, setStartId] = useState(0); 
+  const [startId, setStartId] = useState(0);
+
+  // State for Modal
+  const [selectedEntry, setSelectedEntry] = useState<ArchiveEntry | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // State for Sort/Filter values
   const [sortOption, setSortOption] = useState('');
@@ -78,7 +83,12 @@ export default function MediaView() {
     console.log("MediaView: handleChangeRowsPerPage", { newRowsPerPage: event.target.value });
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
-    setStartId(0); 
+    setStartId(0);
+  };
+
+  const handleCardClick = (entry: ArchiveEntry) => {
+    setSelectedEntry(entry);
+    setIsModalOpen(true);
   };
 
   if (isLoading && !archiveData) {
@@ -214,7 +224,7 @@ export default function MediaView() {
       <Grid container spacing={2}>
         {archiveData.data.map((entry) => (
           <Grid item xs={12} sm={6} md={4} lg={3} xl={2} key={entry.id}>
-            <MediaCard entry={entry} />
+            <MediaCard entry={entry} onClick={handleCardClick} />
           </Grid>
         ))}
       </Grid>
@@ -227,6 +237,11 @@ export default function MediaView() {
         onPageChange={handleChangePage}
         onRowsPerPageChange={handleChangeRowsPerPage}
         sx={{ mt: 2 }}
+      />
+      <MediaDetailModal
+        entry={selectedEntry}
+        open={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
       />
     </Container>
   );

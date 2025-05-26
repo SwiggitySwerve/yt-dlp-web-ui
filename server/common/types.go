@@ -16,7 +16,17 @@ type DownloadInfo struct {
 	FormatNote     string    `json:"format_note,omitempty"`// e.g. "1080p"
 	Duration       float64   `json:"duration,omitempty"`   // Duration in seconds, yt-dlp often gives float
 	CreatedAt      time.Time `json:"-"` // Internal, not from yt-dlp JSON usually for this field name. This is set by our app.
-	FilesizeApprox int64     `json:"filesize_approx,omitempty"` 
+	FilesizeApprox int64     `json:"filesize_approx,omitempty"`
+	Description    string    `json:"description,omitempty"`
+	UploadDate     string    `json:"upload_date,omitempty"` // yt-dlp format YYYYMMDD
+	Tags           []string  `json:"tags,omitempty"`
+	Categories     []string  `json:"categories,omitempty"`
+	Uploader       string    `json:"uploader,omitempty"`    // Specific uploader if different from channel
+	Channel        string    `json:"channel,omitempty"`     // Channel name
+	ChannelURL     string    `json:"channel_url,omitempty"`
+	UploaderID     string    `json:"uploader_id,omitempty"` // Or ChannelID
+	Width          int       `json:"width,omitempty"`
+	Height         int       `json:"height,omitempty"`
     // Removed FileName as it's not standard in yt-dlp -J for this, and can be derived.
     // Kept Size as FilesizeApprox, as per yt-dlp -J output.
 }

@@ -151,3 +151,22 @@ keys:
   seriesInfoLabel: "S{seasonNum} E{episodeNum}" # e.g., S1 E5
   episodeInfoLabel: "Episode: {title}"
   resolutionLabel: "Resolution: {resolution}"
+  # New keys for MediaDetailModal (verified in previous step)
+  noThumbnail: "No thumbnail available"
+  technicalDetailsLabel: "Technical Details"
+  filesizeNotAvailable: "N/A"
+  uploadDateLabel: "Uploaded:"
+  durationLabel: "Duration:"
+  descriptionLabel: "Description"
+  tagsLabel: "Tags"
+  categoriesLabel: "Categories"
+  formatExtLabel: "Format:"
+  formatVCodecLabel: "Video Codec:"
+  formatACodecLabel: "Audio Codec:"
+  formatNoteLabel: "Quality Note:"
+  filesizeLabel: "Size:"
+  sourceUrlLabel: "Source URL:"
+  uploaderLabel: "Uploader:"
+  channelLabel: "Channel:"
+  playlistInfoModalLabel: "Playlist:" # Simpler version for modal if needed
+  seriesInfoModalLabel: "Series:"   # Simpler version for modal if needed
