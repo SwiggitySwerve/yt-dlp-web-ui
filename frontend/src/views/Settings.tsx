@@ -15,7 +15,13 @@ import {
   Switch,
   TextField,
   Typography,
-  capitalize
+  capitalize,
+  Box, // Added
+  List, // Added
+  ListItem, // Added
+  ListItemText, // Added
+  IconButton, // Added
+  Button // Added
 } from '@mui/material'
 import { useAtom } from 'jotai'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
@@ -45,7 +51,11 @@ import {
   servedFromReverseProxySubDirState,
   serverAddressState,
   serverPortState,
-  themeState
+  themeState,
+  // Added imports for preference atoms and type
+  preferredFormatsAtom,
+  preferredQualitiesAtom,
+  PreferenceItem
 } from '../atoms/settings'
 import CookiesTextField from '../components/CookiesTextField'
 import UpdateBinaryButton from '../components/UpdateBinaryButton'
@@ -53,6 +63,11 @@ import { useToast } from '../hooks/toast'
 import { useI18n } from '../hooks/useI18n'
 import Translator from '../lib/i18n'
 import { validateDomain, validateIP } from '../utils'
+// Added imports for Icons
+import DeleteIcon from '@mui/icons-material/Delete';
+import AddIcon from '@mui/icons-material/Add';
+import { v4 as uuidv4 } from 'uuid'; // For generating unique IDs
+
 
 // NEED ABSOLUTELY TO BE SPLIT IN MULTIPLE COMPONENTS
 export default function Settings() {
@@ -75,6 +90,10 @@ export default function Settings() {
 
   const [theme, setTheme] = useAtom(themeState)
 
+  // Added atoms for preferences
+  const [formats, setFormats] = useAtom(preferredFormatsAtom);
+  const [qualities, setQualities] = useAtom(preferredQualitiesAtom);
+
   const [invalidIP, setInvalidIP] = useState(false)
 
   const { i18n } = useI18n()
@@ -96,7 +115,7 @@ export default function Settings() {
         pushMessage(i18n.t('restartAppMessage'), 'info')
       })
     return () => sub.unsubscribe()
-  }, [])
+  }, []) // Removed baseURL$ from deps as it's stable
 
   useEffect(() => {
     const sub = serverAddr$
@@ -118,7 +137,7 @@ export default function Settings() {
         }
       })
     return () => sub.unsubscribe()
-  }, [serverAddr$])
+  }, [serverAddr$, setServerAddr, pushMessage, i18n]) // Added missing deps
 
   useEffect(() => {
     const sub = serverPort$
@@ -132,7 +151,7 @@ export default function Settings() {
         pushMessage(i18n.t('restartAppMessage'), 'info')
       })
     return () => sub.unsubscribe()
-  }, [])
+  }, [serverPort$, setServerPort, pushMessage, i18n]) // Added missing deps
 
   /**
    * Language toggler handler 
@@ -163,10 +182,12 @@ export default function Settings() {
           minHeight: 240,
         }}
       >
+        {/* Existing settings UI */}
         <Typography pb={2} variant="h6" color="primary">
           {i18n.t('settingsAnchor')}
         </Typography>
         <Grid container spacing={2}>
+          {/* Server Address, Port, App Title, Polling Time, Reverse Proxy */}
           <Grid item xs={12} md={11}>
             <TextField
               fullWidth
@@ -258,10 +279,13 @@ export default function Settings() {
             />
           </Grid>
         </Grid>
+        
+        {/* Appearance Settings */}
         <Typography variant="h6" color="primary" sx={{ mt: 0.5, mb: 2 }}>
           Appearance
         </Typography>
         <Grid container spacing={2}>
+          {/* Language, Theme, Accent */}
           <Grid item xs={12}>
             <FormControl fullWidth>
               <InputLabel>{i18n.t('languageSelect')}</InputLabel>
@@ -309,10 +333,111 @@ export default function Settings() {
             </FormControl>
           </Grid>
         </Grid>
+
+        {/* Download Preferences UI */}
+        <Paper sx={{ p: 2, mt: 3, mb: 3 }}> {/* Grouping preferences */}
+          <Typography variant="h6" gutterBottom>{i18n.t('preferredFormatsTitle')}</Typography>
+          <List dense>
+            {formats.map((item) => (
+              <ListItem
+                key={item.id}
+                secondaryAction={
+                  <IconButton edge="end" aria-label="delete" onClick={() => {
+                    setFormats(formats.filter(f => f.id !== item.id));
+                  }}>
+                    <DeleteIcon />
+                  </IconButton>
+                }
+              >
+                <Checkbox
+                  edge="start"
+                  checked={item.enabled}
+                  onChange={(e) => {
+                    setFormats(formats.map(f => f.id === item.id ? { ...f, enabled: e.target.checked } : f));
+                  }}
+                />
+                <ListItemText primary={item.value} />
+              </ListItem>
+            ))}
+          </List>
+          <Box sx={{ display: 'flex', alignItems: 'center', mt: 1, gap: 1 }}>
+            <TextField 
+                id="new-format-input"
+                size="small" 
+                label={i18n.t('addNewFormatLabel')}
+                variant="outlined" 
+            />
+            <Button 
+                variant="contained" 
+                startIcon={<AddIcon />}
+                onClick={() => {
+                    const inputElement = document.getElementById('new-format-input') as HTMLInputElement;
+                    const newValue = inputElement?.value.trim();
+                    if (newValue) {
+                        setFormats([...formats, { id: uuidv4(), value: newValue, enabled: true }]);
+                        if (inputElement) inputElement.value = ''; 
+                    }
+                }}
+            >
+                {i18n.t('addButtonLabel')}
+            </Button>
+          </Box>
+        </Paper>
+
+        <Paper sx={{ p: 2, mb: 3 }}>
+          <Typography variant="h6" gutterBottom>{i18n.t('preferredQualitiesTitle')}</Typography>
+          <List dense>
+            {qualities.map((item) => (
+              <ListItem
+                key={item.id}
+                secondaryAction={
+                  <IconButton edge="end" aria-label="delete" onClick={() => {
+                    setQualities(qualities.filter(q => q.id !== item.id));
+                  }}>
+                    <DeleteIcon />
+                  </IconButton>
+                }
+              >
+                <Checkbox
+                  edge="start"
+                  checked={item.enabled}
+                  onChange={(e) => {
+                    setQualities(qualities.map(q => q.id === item.id ? { ...q, enabled: e.target.checked } : q));
+                  }}
+                />
+                <ListItemText primary={item.value} />
+              </ListItem>
+            ))}
+          </List>
+          <Box sx={{ display: 'flex', alignItems: 'center', mt: 1, gap: 1 }}>
+            <TextField 
+                id="new-quality-input"
+                size="small" 
+                label={i18n.t('addNewQualityLabel')}
+                variant="outlined" 
+            />
+            <Button 
+                variant="contained" 
+                startIcon={<AddIcon />}
+                onClick={() => {
+                    const inputElement = document.getElementById('new-quality-input') as HTMLInputElement;
+                    const newValue = inputElement?.value.trim();
+                    if (newValue) {
+                        setQualities([...qualities, { id: uuidv4(), value: newValue, enabled: true }]);
+                        if (inputElement) inputElement.value = '';
+                    }
+                }}
+            >
+                {i18n.t('addButtonLabel')}
+            </Button>
+          </Box>
+        </Paper>
+        {/* End Download Preferences UI */}
+        
+        {/* General Download Settings */}
         <Typography variant="h6" color="primary" sx={{ mt: 2, mb: 0.5 }}>
           {i18n.t('generalDownloadSettings')}
         </Typography>
-
         <FormControlLabel
           control={
             <Switch
@@ -329,6 +454,7 @@ export default function Settings() {
             {i18n.t('overridesAnchor')}
           </Typography>
           <Stack direction="column">
+            {/* Path Overriding, File Renaming, Auto File Extension, Custom Args Switches */}
             <FormControlLabel
               control={
                 <Switch

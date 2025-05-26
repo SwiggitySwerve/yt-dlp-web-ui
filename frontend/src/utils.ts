@@ -93,3 +93,29 @@ export const getAccentValue = (accent: Accent, mode: ThemeNarrowed) => {
       return mode === 'light' ? blue[700] : blue[300]
   }
 }
+
+// Basic duration formatter (seconds to HH:MM:SS or MM:SS)
+export const formatDuration = (totalSeconds: number): string => {
+  if (isNaN(totalSeconds) || totalSeconds < 0) return '';
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = Math.floor(totalSeconds % 60);
+
+  const paddedSeconds = seconds < 10 ? `0${seconds}` : seconds;
+  const paddedMinutes = minutes < 10 ? `0${minutes}` : minutes;
+
+  if (hours > 0) {
+    return `${hours}:${paddedMinutes}:${paddedSeconds}`;
+  }
+  return `${minutes}:${paddedSeconds}`;
+};
+
+// Basic date formatter (YYYYMMDD to locale string)
+export const formatDate = (dateStr: string): string => {
+  if (!dateStr || dateStr.length !== 8) return dateStr; // Return original if not in YYYYMMDD format
+  const year = dateStr.substring(0, 4);
+  const month = dateStr.substring(4, 6);
+  const day = dateStr.substring(6, 8);
+  const date = new Date(`${year}-${month}-${day}`);
+  return date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+};

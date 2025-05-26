@@ -36,7 +36,8 @@ keys:
   servedFromReverseProxyCheckbox: Is behind a reverse proxy
   urlBase: URL base, for reverse proxy support (subdir), defaults to empty
   newDownloadButton: New download
-  homeButtonLabel: Home
+  homeButtonLabel: Home # Keep for now, might be used elsewhere or for fallback
+  mediaButtonLabel: "Media" # Added
   archiveButtonLabel: Archive
   settingsButtonLabel: Settings
   rpcAuthenticationLabel: RPC authentication
@@ -81,3 +82,47 @@ keys:
   editButtonLabel: 'Edit'
   newSubscriptionButton: New subscription
   clearCompletedButton: 'Clear completed'
+  noActiveDownloads: "No active downloads."
+  noPendingDownloads: "No pending downloads."
+  noCompletedDownloads: "No completed downloads in history."
+  errorLoadingHistory: "Error loading download history"
+  thumbnail: "Thumbnail"
+  title: "Title"
+  source: "Source"
+  downloadDate: "Download Date"
+  actions: "Actions"
+  channelVideosTitle: "Channel Videos" # Fallback title
+  closeButtonLabel: "Close"
+  noVideosFoundInChannel: "No videos found for this channel/playlist."
+  untitledVideo: "Untitled Video"
+  downloadVideoButtonTitle: "Download video"
+  showMoreButtonLabel: "Show More"
+  showLessButtonLabel: "Show Less"
+  videoAlreadyDownloaded: "Video already downloaded"
+  downloadStartedSuccess: "Download started for: {title}"
+  errorStartingDownload: "Error starting download: {message}"
+  errorMissingVideoUrl: "Cannot start download: Video URL is missing."
+  mediaPageTitle: "Media Library"
+  errorLoadingMedia: "Error loading media"
+  noMediaFound: "No media items found in your archive."
+  untitledMedia: "Untitled Media" # Added
+  sortByLabel: "Sort By"
+  noneSortOption: "None"
+  titleAscSortOption: "Title (A-Z)"
+  titleDescSortOption: "Title (Z-A)"
+  dateAscSortOption: "Date (Oldest First)"
+  dateDescSortOption: "Date (Newest First)"
+  durationAscSortOption: "Duration (Shortest First)"
+  durationDescSortOption: "Duration (Longest First)"
+  filterByUploaderLabel: "Filter by Uploader"
+  applyFiltersButtonLabel: "Apply"
+  preferredFormatsTitle: "Preferred Video Formats"
+  preferredQualitiesTitle: "Preferred Video Qualities"
+  addNewFormatLabel: "New format (e.g., mp4, bestvideo*)"
+  addNewQualityLabel: "New quality (e.g., 1080p, best)"
+  addButtonLabel: "Add"
+  filterByFormatLabel: "Filter by Format"
+  allFormatsOption: "All Formats"
+  filterMinDurationLabel: "Min Duration (sec)"
+  filterMaxDurationLabel: "Max Duration (sec)"
+  searchMediaLabel: "Search Media" # Added

@@ -20,6 +20,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
 	"github.com/marcopiovanello/yt-dlp-web-ui/v3/server/archive"
+	archiveDomain "github.com/marcopiovanello/yt-dlp-web-ui/v3/server/archive/domain" // Added
 	"github.com/marcopiovanello/yt-dlp-web-ui/v3/server/archiver"
 	"github.com/marcopiovanello/yt-dlp-web-ui/v3/server/config"
 	"github.com/marcopiovanello/yt-dlp-web-ui/v3/server/dbutil"
@@ -202,7 +203,9 @@ func newServer(c serverConfig) *http.Server {
 	})
 
 	// Archive routes
-	r.Route("/archive", archive.ApplyRouter(c.db))
+	archiveHandler, _, archiveRepo := archive.Container(c.db) // Modified
+	// We might not need archiveService directly in server.go, so using _
+	r.Route("/archive", archiveHandler.ApplyRouter()) // Modified
 
 	// Authentication routes
 	r.Route("/auth", func(r chi.Router) {
@@ -233,7 +236,8 @@ func newServer(c serverConfig) *http.Server {
 	r.Route("/status", status.ApplyRouter(c.mdb))
 
 	// Subscriptions
-	r.Route("/subscriptions", subscription.Container(c.db, cronTaskRunner).ApplyRouter())
+	// Passed archiveRepo to subscription.Container
+	r.Route("/subscriptions", subscription.Container(c.db, cronTaskRunner, archiveRepo).ApplyRouter()) 
 
 	return &http.Server{Handler: r}
 }

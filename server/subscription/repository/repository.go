@@ -83,6 +83,27 @@ func (r *Repository) List(ctx context.Context, start int64, limit int) (*[]data.
 	return &elements, nil
 }
 
+// Get implements domain.Repository.
+func (r *Repository) Get(ctx context.Context, id string) (*data.Subscription, error) {
+	conn, err := r.db.Conn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	row := conn.QueryRowContext(ctx, "SELECT id, url, params, cron FROM subscriptions WHERE id = ?", id)
+
+	var sub data.Subscription
+	err = row.Scan(&sub.Id, &sub.URL, &sub.Params, &sub.CronExpr)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // Standard way to indicate "not found" without it being an application error yet
+		}
+		return nil, err // Other errors
+	}
+	return &sub, nil
+}
+
 // Submit implements domain.Repository.
 func (r *Repository) Submit(ctx context.Context, sub *data.Subscription) (*data.Subscription, error) {
 	conn, err := r.db.Conn(ctx)

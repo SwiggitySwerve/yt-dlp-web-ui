@@ -4,7 +4,7 @@ import { createHashRouter } from 'react-router-dom'
 import Layout from './Layout'
 import Terminal from './views/Terminal'
 
-const Home = lazy(() => import('./views/Home'))
+const MediaView = lazy(() => import('./views/MediaView')) // Renamed import and component
 const Login = lazy(() => import('./views/Login'))
 const Archive = lazy(() => import('./views/Archive'))
 const Settings = lazy(() => import('./views/Settings'))
@@ -20,10 +20,10 @@ export const router = createHashRouter([
     Component: () => <Layout />,
     children: [
       {
-        path: '/',
+        path: '/media', // Changed path
         element: (
           <Suspense fallback={<CircularProgress />}>
-            <Home />
+            <MediaView /> {/* Changed component */}
           </Suspense >
         ),
         errorElement: (

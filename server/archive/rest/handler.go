@@ -2,6 +2,7 @@ package rest
 
 import (
 	"encoding/json"
+	"log/slog" // Ensure slog is imported
 	"net/http"
 	"strconv"
 
@@ -13,25 +14,34 @@ import (
 	middlewares "github.com/marcopiovanello/yt-dlp-web-ui/v3/server/middleware"
 )
 
-type Handler struct {
+type Handler struct { // Using Handler as per prompt and previous file state
 	service domain.Service
 }
 
 func New(service domain.Service) domain.RestHandler {
-	return &Handler{
+	return &Handler{ // Using Handler
 		service: service,
 	}
 }
 
+
 // List implements domain.RestHandler.
-func (h *Handler) List() http.HandlerFunc {
+func (h *Handler) List() http.HandlerFunc { // Using Handler
 	return func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
 		w.Header().Set("Content-Type", "application/json")
 
+		query := r.URL.Query()
 		var (
-			startRowIdParam = r.URL.Query().Get("id")
-			LimitParam      = r.URL.Query().Get("limit")
+			startRowIdParam  = query.Get("id")
+			limitParam       = query.Get("limit")
+			sortByParam      = query.Get("sort_by")
+			// New filter params from query
+			filterUploader    = query.Get("filter_uploader")
+			filterFormat      = query.Get("filter_format")
+			filterMinDuration = query.Get("filter_min_duration")
+			filterMaxDuration = query.Get("filter_max_duration")
+			searchQueryParam  = query.Get("search_query") // New
 		)
 
 		startRowId, err := strconv.Atoi(startRowIdParam)
@@ -39,21 +49,65 @@ func (h *Handler) List() http.HandlerFunc {
 			startRowId = 0
 		}
 
-		limit, err := strconv.Atoi(LimitParam)
+		limit, err := strconv.Atoi(limitParam)
 		if err != nil {
-			limit = 50
+			limit = 50 // Default limit
 		}
 
-		res, err := h.service.List(r.Context(), startRowId, limit)
+		filters := make(map[string]string)
+		if filterUploader != "" {
+			filters["uploader"] = filterUploader
+		}
+		if filterFormat != "" {
+			filters["format"] = filterFormat
+		}
+		if filterMinDuration != "" {
+			filters["min_duration"] = filterMinDuration
+		}
+		if filterMaxDuration != "" {
+			filters["max_duration"] = filterMaxDuration
+		}
+		// Add more filters here as needed
+
+		slog.Info("Archive List Request", 
+			"startRowId", startRowId, 
+			"limit", limit, 
+			"sortBy", sortByParam, 
+			"filters", filters,
+			"searchQuery", searchQueryParam, // New
+		)
+
+		res, err := h.service.List(r.Context(), startRowId, limit, sortByParam, filters, searchQueryParam) // Pass searchQueryParam
 		if err != nil {
+			slog.Error("Error from archive service List", "error", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		if err := json.NewEncoder(w).Encode(res); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+			slog.Error("Failed to encode archive list response", "error", err)
+			// Consider returning http.Error here as well
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError) // Added error response
+			return // Added return
 		}
+	}
+}
+
+// ApplyRouter, Archive, SoftDelete, HardDelete, GetCursor methods remain here...
+func (h *Handler) ApplyRouter() func(chi.Router) { // Using Handler
+	return func(r chi.Router) {
+		if config.Instance().RequireAuth {
+			r.Use(middlewares.Authenticated)
+		}
+		if config.Instance().UseOpenId {
+			r.Use(openid.Middleware)
+		}
+
+		r.Get("/", h.List())
+		r.Get("/cursor/{id}", h.GetCursor())
+		r.Post("/", h.Archive())
+		r.Delete("/soft/{id}", h.SoftDelete())
+		r.Delete("/hard/{id}", h.HardDelete())
 	}
 }
 
@@ -93,6 +147,10 @@ func (h *Handler) HardDelete() http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		if res == nil { // Handle not found case if service returns nil for that
+			http.Error(w, "Entry not found", http.StatusNotFound)
+			return
+		}
 
 		if err := json.NewEncoder(w).Encode(res); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -114,6 +172,10 @@ func (h *Handler) SoftDelete() http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		if res == nil { // Handle not found case
+			http.Error(w, "Entry not found", http.StatusNotFound)
+			return
+		}
 
 		if err := json.NewEncoder(w).Encode(res); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -128,7 +190,10 @@ func (h *Handler) GetCursor() http.HandlerFunc {
 		defer r.Body.Close()
 		w.Header().Set("Content-Type", "application/json")
 
-		id := chi.URLParam(r, "id")
+		id := chi.URLParam(r, "id") 
+		if id == "" { 
+			id = r.URL.Query().Get("id")
+		}
 
 		cursorId, err := h.service.GetCursor(r.Context(), id)
 		if err != nil {
@@ -140,23 +205,5 @@ func (h *Handler) GetCursor() http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-	}
-}
-
-// ApplyRouter implements domain.RestHandler.
-func (h *Handler) ApplyRouter() func(chi.Router) {
-	return func(r chi.Router) {
-		if config.Instance().RequireAuth {
-			r.Use(middlewares.Authenticated)
-		}
-		if config.Instance().UseOpenId {
-			r.Use(openid.Middleware)
-		}
-
-		r.Get("/", h.List())
-		r.Get("/cursor/{id}", h.GetCursor())
-		r.Post("/", h.Archive())
-		r.Delete("/soft/{id}", h.SoftDelete())
-		r.Delete("/hard/{id}", h.HardDelete())
 	}
 }
