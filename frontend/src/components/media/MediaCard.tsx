@@ -85,7 +85,30 @@ const MediaCard: React.FC<MediaCardProps> = ({ entry, onClick }) => {
               {uploader}
             </Typography>
           )}
-          {/* Add resolution or other details here if needed */}
+          {/* Display Playlist Info */}
+          {metadata.playlist_title && metadata.playlist_index && (
+            <Typography variant="body2" color="text.secondary" noWrap title={`${metadata.playlist_title} (Video ${metadata.playlist_index})`}>
+              {i18n.t('playlistInfoLabel', { title: metadata.playlist_title, index: metadata.playlist_index })}
+            </Typography>
+          )}
+          {/* Display Series Info - using common yt-dlp field names */}
+          {metadata.season_number && metadata.episode_number && (
+            <Typography variant="body2" color="text.secondary" noWrap>
+              {i18n.t('seriesInfoLabel', { seasonNum: metadata.season_number, episodeNum: metadata.episode_number })}
+            </Typography>
+          )}
+          {/* Display Episode Title if different from main title and series info is not present (to avoid redundancy) */}
+          {metadata.episode_title && metadata.episode_title !== title && !metadata.season_number && (
+            <Typography variant="body2" color="text.secondary" noWrap title={metadata.episode_title}>
+              {i18n.t('episodeInfoLabel', { title: metadata.episode_title })}
+            </Typography>
+          )}
+          {/* Display Resolution */}
+          {(metadata.resolution || (metadata.width && metadata.height)) && (
+            <Typography variant="body2" color="text.secondary" noWrap>
+              {i18n.t('resolutionLabel', { resolution: metadata.resolution || `${metadata.width}x${metadata.height}` })}
+            </Typography>
+          )}
         </CardContent>
       </CardActionArea>
     </Card>

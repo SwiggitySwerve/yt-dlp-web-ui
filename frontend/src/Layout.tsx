@@ -5,6 +5,7 @@ import CloudDownloadIcon from '@mui/icons-material/CloudDownload'
 import PermMediaIcon from '@mui/icons-material/PermMedia'; // Added
 import LiveTvIcon from '@mui/icons-material/LiveTv'
 import Menu from '@mui/icons-material/Menu'
+import DownloadForOfflineIcon from '@mui/icons-material/DownloadForOffline';
 import SettingsIcon from '@mui/icons-material/Settings'
 import TerminalIcon from '@mui/icons-material/Terminal'
 import UpdateIcon from '@mui/icons-material/Update'
@@ -28,6 +29,7 @@ import Drawer from './components/Drawer'
 import Footer from './components/Footer'
 import Logout from './components/Logout'
 import SocketSubscriber from './components/SocketSubscriber'
+import DownloadNotifier from './components/notifications/DownloadNotifier';
 import ThemeToggler from './components/ThemeToggler'
 import { useI18n } from './hooks/useI18n'
 import Toaster from './providers/ToasterProvider'
@@ -61,6 +63,7 @@ export default function Layout() {
     <ThemeProvider theme={theme}>
       <title>{settings.appTitle}</title>
       <SocketSubscriber />
+      <DownloadNotifier /> {/* <--- Add this line */}
       <Box sx={{ display: 'flex' }}>
         <CssBaseline />
         <AppBar position="absolute" open={open}>
@@ -179,6 +182,19 @@ export default function Layout() {
                   <TerminalIcon />
                 </ListItemIcon>
                 <ListItemText primary={i18n.t('logsTitle')} />
+              </ListItemButton>
+            </Link>
+            <Link to={'/active_downloads'} style={
+              {
+                textDecoration: 'none',
+                color: mode === 'dark' ? '#ffffff' : '#000000DE'
+              }
+            }>
+              <ListItemButton>
+                <ListItemIcon>
+                  <DownloadForOfflineIcon />
+                </ListItemIcon>
+                <ListItemText primary={i18n.t('ongoingDownloadsNavLabel')} />
               </ListItemButton>
             </Link>
             <Link to={'/settings'} style={

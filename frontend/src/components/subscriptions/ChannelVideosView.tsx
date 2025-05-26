@@ -131,6 +131,32 @@ const ChannelVideosView: React.FC<ChannelVideosViewProps> = ({ channelData, onCl
                 {video.uploader && <Typography variant="body2" color="text.secondary">{video.uploader}</Typography>}
                 {video.upload_date && <Typography variant="body2" color="text.secondary">{formatDate(video.upload_date)}</Typography>}
                 {video.duration && <Typography variant="body2" color="text.secondary">{formatDuration(video.duration)}</Typography>}
+
+                {/* Display Playlist Info */}
+                {video.playlist_title && video.playlist_index && (
+                  <Typography variant="body2" color="text.secondary">
+                    {i18n.t('playlistInfoLabel', { title: video.playlist_title, index: video.playlist_index })}
+                  </Typography>
+                )}
+
+                {/* Display Series Info - Placeholder as fields are not in YtdlpVideoInfo */}
+                {(video as any).season_number && (video as any).episode_number && (
+                  <Typography variant="body2" color="text.secondary">
+                    {i18n.t('seriesInfoLabel', { seasonNum: (video as any).season_number, episodeNum: (video as any).episode_number })}
+                  </Typography>
+                )}
+                {(video as any).episode_title && (video as any).episode_title !== video.title && (
+                  <Typography variant="body2" color="text.secondary">
+                    {i18n.t('episodeInfoLabel', { title: (video as any).episode_title })}
+                  </Typography>
+                )}
+
+                {/* Display Resolution - Placeholder as field is not in YtdlpVideoInfo */}
+                {(video as any).resolution && (
+                  <Typography variant="body2" color="text.secondary">
+                    {i18n.t('resolutionLabel', { resolution: (video as any).resolution })}
+                  </Typography>
+                )}
               </CardContent>
               <Box sx={{ p: 1, display: 'flex', justifyContent: 'flex-end' }}>
                 <IconButton

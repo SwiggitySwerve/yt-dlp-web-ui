@@ -126,3 +126,28 @@ keys:
   filterMinDurationLabel: "Min Duration (sec)"
   filterMaxDurationLabel: "Max Duration (sec)"
   searchMediaLabel: "Search Media" # Added
+  ongoingDownloadsNavLabel: "Ongoing Downloads" # For sidebar navigation
+  ongoingDownloadsTitle: "Ongoing Downloads" # Title for the ActiveDownloadsViewer page
+  pendingDownloadsTitle: "Pending"
+  activeDownloadsTitle: "Active"
+  erroredDownloadsTitle: "Errored"
+  noPendingDownloads: "No downloads are currently pending."
+  noActiveDownloads: "No downloads are currently active."
+  noErroredDownloads: "No downloads have errored."
+  cancelDownloadButtonTooltip: "Cancel Download"
+  clearErroredButtonTooltip: "Clear Errored Download"
+  downloadStatusPending: "Status: Pending"
+  downloadStatusDownloading: "Status: Downloading"
+  downloadStatusErrored: "Status: Errored"
+  downloadCancelledMessage: "Download {id} cancelled."
+  errorCancellingDownload: "Error cancelling download {id}: {message}"
+  downloadClearedMessage: "Errored download {id} cleared."
+  errorClearingDownload: "Error clearing download {id}: {message}"
+  downloadProgressLabel: "{percentage} complete at {speed}, ETA: {eta}" # For active download progress text
+  downloadCompletedNotif: "Download complete: {title}"
+  downloadErroredNotif: "Download error for {title}: {error}"
+  unknownError: "An unknown error occurred" # Fallback error message
+  playlistInfoLabel: "Playlist: {title} (Part {index})"
+  seriesInfoLabel: "S{seasonNum} E{episodeNum}" # e.g., S1 E5
+  episodeInfoLabel: "Episode: {title}"
+  resolutionLabel: "Resolution: {resolution}"
