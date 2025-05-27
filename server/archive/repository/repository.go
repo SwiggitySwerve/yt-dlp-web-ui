@@ -32,16 +32,17 @@ func (r *Repository) Archive(ctx context.Context, entry *data.ArchiveEntry) erro
 
 	_, err = conn.ExecContext(
 		ctx,
-		"INSERT INTO archive (id, title, path, thumbnail, source, metadata, created_at, duration, format) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		uuid.NewString(), 
+		"INSERT INTO archive (id, title, path, thumbnail, source, metadata, created_at, duration, format, uploader) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		uuid.NewString(),
 		entry.Title,
 		entry.Path,
 		entry.Thumbnail,
 		entry.Source,
 		entry.Metadata,
 		entry.CreatedAt,
-		entry.Duration, 
-		entry.Format,   
+		entry.Duration,
+		entry.Format,
+		entry.Uploader, // Added entry.Uploader
 	)
 	return err
 }
@@ -60,7 +61,7 @@ func (r *Repository) SoftDelete(ctx context.Context, id string) (*data.ArchiveEn
 	defer tx.Rollback()
 
 	var model data.ArchiveEntry
-	row := tx.QueryRowContext(ctx, "SELECT id, title, path, thumbnail, source, metadata, created_at, duration, format FROM archive WHERE id = ?", id)
+	row := tx.QueryRowContext(ctx, "SELECT id, title, path, thumbnail, source, metadata, created_at, duration, format, uploader FROM archive WHERE id = ?", id) // Added uploader
 	if err := row.Scan(
 		&model.Id,
 		&model.Title,
@@ -69,10 +70,11 @@ func (r *Repository) SoftDelete(ctx context.Context, id string) (*data.ArchiveEn
 		&model.Source,
 		&model.Metadata,
 		&model.CreatedAt,
-		&model.Duration, 
-		&model.Format,   
+		&model.Duration,
+		&model.Format,
+		&model.Uploader, // Added &model.Uploader
 	); err != nil {
-		return nil, err 
+		return nil, err
 	}
 
 	_, err = tx.ExecContext(ctx, "DELETE FROM archive WHERE id = ?", id)
@@ -111,32 +113,38 @@ func (r *Repository) List(ctx context.Context, startRowId int, limit int, sortBy
 	var args []interface{}
 	var conditions []string // Used for non-FTS and FTS filter parts
 
-	if searchQuery != "" {
+	// Build ftsMatcherArg
+	titleSearchTerm := searchQuery
+	tagsSearchTerm, hasTagsFilter := filters["filter_tags"]
+	var ftsMatcherArg string
+
+	if titleSearchTerm != "" && hasTagsFilter && tagsSearchTerm != "" {
+		ftsMatcherArg = "title:(" + titleSearchTerm + ") tags_fts:(" + tagsSearchTerm + ")"
+	} else if titleSearchTerm != "" {
+		ftsMatcherArg = "title:(" + titleSearchTerm + ")"
+	} else if hasTagsFilter && tagsSearchTerm != "" {
+		ftsMatcherArg = "tags_fts:(" + tagsSearchTerm + ")"
+	}
+
+	if ftsMatcherArg != "" {
 		// FTS Search Path
-		ftsQueryToken := searchQuery // Basic: use as is. Or add wildcards: searchQuery + "*"
-		                              // For prefix search, it should be searchQuery + "*"
-                                      // For FTS5, the column name is part of the MATCH expression if searching specific columns
-                                      // Assuming archive_fts MATCHS all its indexed columns.
-                                      // If only 'title' is indexed: "title MATCH ?"
+		ftsSubQuery := "SELECT rowid FROM archive_fts WHERE archive_fts MATCH ?"
+		args = append(args, ftsMatcherArg) // Use ftsMatcherArg for the MATCH clause
 
-		// Subquery to get rowids from FTS table
-		// Assuming archive_fts table has a column that directly matches the search query.
-		// If multiple columns in archive_fts (e.g. title, description_fts), the MATCH might be "archive_fts MATCH ?"
-		// or specific like "title MATCH ? OR description_fts MATCH ?"
-		ftsSubQuery := "SELECT rowid FROM archive_fts WHERE archive_fts MATCH ?" // General FTS match
-		args = append(args, ftsQueryToken)
-
-		finalQuerySb.WriteString("SELECT r.rowid, r.id, r.title, r.path, r.thumbnail, r.source, r.metadata, r.created_at, r.duration, r.format ")
+		finalQuerySb.WriteString("SELECT r.rowid, r.id, r.title, r.path, r.thumbnail, r.source, r.metadata, r.created_at, r.duration, r.format, r.uploader ")
 		finalQuerySb.WriteString("FROM archive r JOIN (")
 		finalQuerySb.WriteString(ftsSubQuery)
 		finalQuerySb.WriteString(") fts_matches ON r.rowid = fts_matches.rowid ")
 
 		// Apply other filters from the 'filters' map to the main query
+		// Note: filter_tags is already handled by ftsMatcherArg, so it should be skipped here.
 		for key, value := range filters {
 			if value == "" { continue }
+			if key == "filter_tags" { continue } // Skip filter_tags as it's in ftsMatcherArg
+
 			switch key {
 			case "uploader":
-				conditions = append(conditions, "LOWER(r.source) LIKE ?") // Alias 'r' for archive table
+				conditions = append(conditions, "LOWER(r.uploader) LIKE ?")
 				args = append(args, "%"+strings.ToLower(value)+"%")
 			case "format":
 				conditions = append(conditions, "LOWER(r.format) = ?")
@@ -176,13 +184,16 @@ func (r *Repository) List(ctx context.Context, startRowId int, limit int, sortBy
 
 	} else {
 		// Non-FTS Path (existing logic)
-		finalQuerySb.WriteString("SELECT rowid, id, title, path, thumbnail, source, metadata, created_at, duration, format FROM archive ")
+		// This path is taken if ftsMatcherArg is empty (neither title nor tags search)
+		finalQuerySb.WriteString("SELECT rowid, id, title, path, thumbnail, source, metadata, created_at, duration, format, uploader FROM archive ")
 		
-		for key, value := range filters { 
+		// Apply filters. filter_tags would be ignored here correctly as ftsMatcherArg is empty.
+		for key, value := range filters {
 			if value == "" { continue }
+			// if key == "filter_tags" { continue; } // Technically not needed here as ftsMatcherArg would be empty
 			switch key {
 			case "uploader":
-				conditions = append(conditions, "LOWER(source) LIKE ?")
+				conditions = append(conditions, "LOWER(uploader) LIKE ?")
 				args = append(args, "%"+strings.ToLower(value)+"%")
 			case "format":
 				conditions = append(conditions, "LOWER(format) = ?")
@@ -263,8 +274,9 @@ func (r *Repository) List(ctx context.Context, startRowId int, limit int, sortBy
 			&entry.Source,
 			&entry.Metadata,
 			&entry.CreatedAt,
-			&entry.Duration, 
-			&entry.Format,   
+			&entry.Duration,
+			&entry.Format,
+			&entry.Uploader, // Added &entry.Uploader
 		); err != nil {
 			return &entries, err
 		}

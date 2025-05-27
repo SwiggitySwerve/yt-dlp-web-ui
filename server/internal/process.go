@@ -269,6 +269,14 @@ func (p *Process) Complete() {
 	if p.Progress.Percentage == "" && p.Progress.Speed == 0 {
 		var serializedMetadata bytes.Buffer
 		json.NewEncoder(&serializedMetadata).Encode(p.Info)
+
+		var uploaderName string
+		if p.Info.Uploader != "" {
+			uploaderName = p.Info.Uploader
+		} else {
+			uploaderName = p.Info.Channel // Fallback to channel name
+		}
+
 		archiver.Publish(&archiver.Message{ // archiver.Message is an alias for archive.Entity (data.ArchiveEntry)
 			Id:        p.Id,
 			Path:      p.Output.SavedFilePath,
@@ -279,6 +287,7 @@ func (p *Process) Complete() {
 			CreatedAt: p.Info.CreatedAt, // This is when metadata was fetched
 			Duration:  int64(p.Info.Duration), // New
 			Format:    p.Info.Ext,             // New
+			Uploader:  uploaderName,           // Newly added
 		})
 	}
 	p.Progress = DownloadProgress{

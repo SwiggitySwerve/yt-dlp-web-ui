@@ -13,4 +13,5 @@ type ArchiveEntry struct {
 	CreatedAt time.Time `json:"created_at"`
 	Duration  int64     `json:"duration,omitempty"` // New, in seconds
 	Format    string    `json:"format,omitempty"`   // New, e.g., "mp4", "webm"
+	Uploader  string    `json:"uploader,omitempty"` // New field for uploader
 }

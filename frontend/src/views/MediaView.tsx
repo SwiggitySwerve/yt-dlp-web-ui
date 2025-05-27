@@ -23,9 +23,10 @@ export default function MediaView() {
   const [sortOption, setSortOption] = useState('');
   const [filterUploader, setFilterUploader] = useState('');
   const [filterFormat, setFilterFormat] = useState(''); 
-  const [filterMinDuration, setFilterMinDuration] = useState(''); 
-  const [filterMaxDuration, setFilterMaxDuration] = useState(''); 
-  const [searchQuery, setSearchQuery] = useState(''); // Step 1: Add State Variable
+  const [filterMinDuration, setFilterMinDuration] = useState('');
+  const [filterMaxDuration, setFilterMaxDuration] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterTags, setFilterTags] = useState(''); // 1. Add State for Tag Filter
 
   // Update useFetch URL Construction
   const queryParams = new URLSearchParams();
@@ -46,8 +47,11 @@ export default function MediaView() {
   if (filterMaxDuration) {
     queryParams.append('filter_max_duration', filterMaxDuration);
   }
-  if (searchQuery) { // Step 3: Add search_query to URL
+  if (searchQuery) {
     queryParams.append('search_query', searchQuery);
+  }
+  if (filterTags) { // 3. Include Tag Filter in API Request
+    queryParams.append('filter_tags', filterTags);
   }
 
   const { data: archiveData, isLoading, error, fetcher } = useFetch<PaginatedResponse<ArchiveEntry[]>>(
@@ -56,12 +60,12 @@ export default function MediaView() {
 
   // Update useEffect for fetcher
   useEffect(() => {
-    console.log("MediaView: Fetching archive data due to dependency change.", { 
-        startId, rowsPerPage, sortOption, filterUploader, 
-        filterFormat, filterMinDuration, filterMaxDuration, searchQuery // Added searchQuery
+    console.log("MediaView: Fetching archive data due to dependency change.", {
+        startId, rowsPerPage, sortOption, filterUploader,
+        filterFormat, filterMinDuration, filterMaxDuration, searchQuery, filterTags // Added filterTags
     });
     fetcher();
-  }, [startId, rowsPerPage, sortOption, filterUploader, filterFormat, filterMinDuration, filterMaxDuration, searchQuery, fetcher]); // Step 4: Add searchQuery to deps
+  }, [startId, rowsPerPage, sortOption, filterUploader, filterFormat, filterMinDuration, filterMaxDuration, searchQuery, filterTags, fetcher]); // 4. Add Tag Filter to useEffect Dependencies
 
   const handleChangePage = (event: unknown, newPage: number) => {
     console.log("MediaView: handleChangePage", { newPage, currentPage: page });
@@ -171,6 +175,17 @@ export default function MediaView() {
           sx={{ minWidth: 200 }}
         />
 
+        {/* 2. Add TextField for Tag Input */}
+        <TextField
+          label={i18n.t('filterByTagsLabel')}
+          variant="outlined"
+          size="small"
+          value={filterTags}
+          onChange={(e) => setFilterTags(e.target.value)}
+          helperText={i18n.t('filterByTagsHelperText')}
+          sx={{ minWidth: 200 }}
+        />
+
         <FormControl sx={{ minWidth: 150 }} size="small">
           <InputLabel id="filter-format-label">{i18n.t('filterByFormatLabel')}</InputLabel>
           <Select
@@ -209,13 +224,13 @@ export default function MediaView() {
         />
         
         <Button variant="contained" onClick={() => {
-            console.log("MediaView: Apply Filters/Sort Clicked", { 
-                sortOption, filterUploader, filterFormat, 
-                filterMinDuration, filterMaxDuration, searchQuery, // Step 5: Update console.log
-                currentPage: page, currentStartId: startId 
+            console.log("MediaView: Apply Filters/Sort Clicked", {
+                sortOption, filterUploader, filterFormat,
+                filterMinDuration, filterMaxDuration, searchQuery, filterTags, // 5. Update console.log
+                currentPage: page, currentStartId: startId
             });
-            setPage(0); 
-            setStartId(0); 
+            setPage(0);
+            setStartId(0);
           }}>
           {i18n.t('applyFiltersButtonLabel')}
         </Button>

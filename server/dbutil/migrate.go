@@ -43,7 +43,10 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 			thumbnail TEXT,
 			source VARCHAR(255),
 			metadata TEXT,
-			created_at DATETIME
+			created_at DATETIME,
+			duration INTEGER,
+			format TEXT,
+			uploader TEXT
 		)`,
 	); err != nil {
 		return err

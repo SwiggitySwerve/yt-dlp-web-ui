@@ -170,3 +170,6 @@ keys:
   channelLabel: "Channel:"
   playlistInfoModalLabel: "Playlist:" # Simpler version for modal if needed
   seriesInfoModalLabel: "Series:"   # Simpler version for modal if needed
+  # Keys for Tag Filtering in MediaView
+  filterByTagsLabel: "Filter by Tags"
+  filterByTagsHelperText: "space-separated tags (e.g., nature outdoor)"

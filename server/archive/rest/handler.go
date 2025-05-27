@@ -42,6 +42,7 @@ func (h *Handler) List() http.HandlerFunc { // Using Handler
 			filterMinDuration = query.Get("filter_min_duration")
 			filterMaxDuration = query.Get("filter_max_duration")
 			searchQueryParam  = query.Get("search_query") // New
+			filterTags        = query.Get("filter_tags")  // Added filter_tags
 		)
 
 		startRowId, err := strconv.Atoi(startRowIdParam)
@@ -67,17 +68,21 @@ func (h *Handler) List() http.HandlerFunc { // Using Handler
 		if filterMaxDuration != "" {
 			filters["max_duration"] = filterMaxDuration
 		}
+		if filterTags != "" { // Added filterTags to filters map
+			filters["filter_tags"] = filterTags
+		}
 		// Add more filters here as needed
 
-		slog.Info("Archive List Request", 
-			"startRowId", startRowId, 
-			"limit", limit, 
-			"sortBy", sortByParam, 
-			"filters", filters,
-			"searchQuery", searchQueryParam, // New
+		slog.Info("Archive List Request",
+			"startRowId", startRowId,
+			"limit", limit,
+			"sortBy", sortByParam,
+			"filters", filters, // filters map now includes filter_tags if present
+			"searchQuery", searchQueryParam,
+			"filterTags", filterTags, // Explicitly logging received filterTags
 		)
 
-		res, err := h.service.List(r.Context(), startRowId, limit, sortByParam, filters, searchQueryParam) // Pass searchQueryParam
+		res, err := h.service.List(r.Context(), startRowId, limit, sortByParam, filters, searchQueryParam)
 		if err != nil {
 			slog.Error("Error from archive service List", "error", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
