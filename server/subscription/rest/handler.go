@@ -203,3 +203,203 @@ func (h *RestHandler) UpdateByExample() http.HandlerFunc {
 
 // Ensure New is here or that the one at the top is sufficient.
 // The diff has placed New() higher up, which is fine.
+
+// --- Implementations for SubscriptionVideoUpdate handlers ---
+
+func (h *RestHandler) ListUpdates() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		w.Header().Set("Content-Type", "application/json")
+
+		query := r.URL.Query()
+		limitParam := query.Get("limit")
+		offsetParam := query.Get("offset")
+		subIDsParam := query.Get("subscription_ids")
+
+		limit, err := strconv.Atoi(limitParam)
+		if err != nil || limit <= 0 {
+			limit = 20 // Default limit
+		}
+		offset, err := strconv.Atoi(offsetParam)
+		if err != nil || offset < 0 {
+			offset = 0 // Default offset
+		}
+
+		var parsedSubscriptionIDs []string
+		if subIDsParam != "" {
+			parsedSubscriptionIDs = strings.Split(subIDsParam, ",")
+		}
+
+		slog.Info("Handler: ListUpdates called", "limit", limit, "offset", offset, "subscriptionIDs", parsedSubscriptionIDs)
+		updates, err := h.svc.ListUnseenUpdates(r.Context(), limit, offset, parsedSubscriptionIDs)
+		if err != nil {
+			slog.Error("Error from ListUnseenUpdates service", "error", err)
+			http.Error(w, "Failed to list updates: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if err := json.NewEncoder(w).Encode(updates); err != nil {
+			slog.Error("Failed to encode updates list response", "error", err)
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		}
+	}
+}
+
+func (h *RestHandler) GetUnseenUpdatesCount() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		w.Header().Set("Content-Type", "application/json")
+
+		subIDsParam := r.URL.Query().Get("subscription_ids")
+		var parsedSubscriptionIDs []string
+		if subIDsParam != "" {
+			parsedSubscriptionIDs = strings.Split(subIDsParam, ",")
+		}
+		
+		slog.Info("Handler: GetUnseenUpdatesCount called", "subscriptionIDs", parsedSubscriptionIDs)
+		count, err := h.svc.GetUnseenUpdatesCount(r.Context(), parsedSubscriptionIDs)
+		if err != nil {
+			slog.Error("Error from GetUnseenUpdatesCount service", "error", err)
+			http.Error(w, "Failed to get unseen updates count: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if err := json.NewEncoder(w).Encode(map[string]int{"count": count}); err != nil {
+			slog.Error("Failed to encode unseen updates count response", "error", err)
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		}
+	}
+}
+
+func (h *RestHandler) MarkUpdateSeen() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		w.Header().Set("Content-Type", "application/json")
+
+		updateID := chi.URLParam(r, "updateID")
+		if updateID == "" {
+			slog.Error("Update ID is missing in path for MarkUpdateSeen")
+			http.Error(w, "Update ID is required", http.StatusBadRequest)
+			return
+		}
+
+		var reqBody struct {
+			Seen bool `json:"seen"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+			slog.Error("Failed to decode request body for MarkUpdateSeen", "error", err)
+			http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		
+		slog.Info("Handler: MarkUpdateSeen called", "updateID", updateID, "seen", reqBody.Seen)
+		err := h.svc.MarkUpdateAsSeen(r.Context(), updateID, reqBody.Seen)
+		if err != nil {
+			slog.Error("Error from MarkUpdateAsSeen service", "updateID", updateID, "error", err)
+			http.Error(w, "Failed to mark update as seen: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Update marked as seen successfully"})
+	}
+}
+
+func (h *RestHandler) MarkAllUpdatesSeen() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		w.Header().Set("Content-Type", "application/json")
+
+		subIDsParam := r.URL.Query().Get("subscription_ids")
+		var parsedSubscriptionIDs []string
+		if subIDsParam != "" {
+			parsedSubscriptionIDs = strings.Split(subIDsParam, ",")
+		}
+
+		var reqBody struct {
+			Seen bool `json:"seen"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+			slog.Error("Failed to decode request body for MarkAllUpdatesSeen", "error", err)
+			http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		
+		slog.Info("Handler: MarkAllUpdatesSeen called", "subscriptionIDs", parsedSubscriptionIDs, "seen", reqBody.Seen)
+		affectedCount, err := h.svc.MarkAllUpdatesAsSeen(r.Context(), parsedSubscriptionIDs, reqBody.Seen)
+		if err != nil {
+			slog.Error("Error from MarkAllUpdatesAsSeen service", "error", err)
+			http.Error(w, "Failed to mark all updates as seen: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]interface{}{"message": "All updates marked as seen successfully", "affected_count": affectedCount})
+	}
+}
+
+func (h *RestHandler) DownloadUpdate() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		w.Header().Set("Content-Type", "application/json")
+
+		updateID := chi.URLParam(r, "updateID")
+		if updateID == "" {
+			slog.Error("Update ID is missing in path for DownloadUpdate")
+			http.Error(w, "Update ID is required", http.StatusBadRequest)
+			return
+		}
+		
+		slog.Info("Handler: DownloadUpdate called", "updateID", updateID)
+
+		// Assuming h.svc has GetSubscriptionUpdate method (added to domain.Service in Turn 54)
+		videoUpdate, err := h.svc.GetSubscriptionUpdate(r.Context(), updateID)
+		if err != nil {
+			slog.Error("Error from GetSubscriptionUpdate service", "updateID", updateID, "error", err)
+			http.Error(w, "Failed to get video update details: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if videoUpdate == nil {
+			slog.Error("Video update not found", "updateID", updateID)
+			http.Error(w, "Video update not found", http.StatusNotFound)
+			return
+		}
+
+		p := &internal.Process{
+			Url:        videoUpdate.VideoURL,
+			Params:     []string{}, // Placeholder: Consider how to get relevant params
+			AutoRemove: false,      
+		}
+		h.memDB.Set(p)  // Generate ID for the process
+		h.mq.Publish(p) // Queue for download
+
+		statusUpdateErr := h.svc.UpdateSubscriptionUpdateStatus(r.Context(), updateID, "queued_for_download")
+		if statusUpdateErr != nil {
+			slog.Error("Failed to update video update status after queuing for download", "updateID", updateID, "error", statusUpdateErr)
+		}
+
+		w.WriteHeader(http.StatusAccepted)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Video queued for download", "process_id": p.Id})
+	}
+}
+
+func (h *RestHandler) DeleteUpdate() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		w.Header().Set("Content-Type", "application/json")
+
+		updateID := chi.URLParam(r, "updateID")
+		if updateID == "" {
+			slog.Error("Update ID is missing in path for DeleteUpdate")
+			http.Error(w, "Update ID is required", http.StatusBadRequest)
+			return
+		}
+		
+		slog.Info("Handler: DeleteUpdate called", "updateID", updateID)
+		err := h.svc.DeleteSubscriptionUpdate(r.Context(), updateID)
+		if err != nil {
+			slog.Error("Error from DeleteSubscriptionUpdate service", "updateID", updateID, "error", err)
+			http.Error(w, "Failed to delete update: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Update deleted successfully"})
+	}
+}

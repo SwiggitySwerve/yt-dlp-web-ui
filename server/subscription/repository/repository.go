@@ -152,3 +152,225 @@ func New(db *sql.DB) domain.Repository {
 		db: db,
 	}
 }
+
+// --- Implementation of new methods for SubscriptionVideoUpdate ---
+
+func (r *Repository) InsertSubscriptionUpdate(ctx context.Context, update *data.SubscriptionVideoUpdate) error {
+	conn, err := r.db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	if update.Id == "" {
+		update.Id = uuid.NewString()
+	}
+	if update.DetectedAt.IsZero() {
+		update.DetectedAt = time.Now()
+	}
+	if update.Status == "" {
+		update.Status = "new" // Default status
+	}
+
+
+	_, err = conn.ExecContext(
+		ctx,
+		"INSERT INTO subscription_video_updates (id, subscription_id, video_url, video_title, thumbnail_url, published_at, detected_at, is_seen, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		update.Id,
+		update.SubscriptionID,
+		update.VideoURL,
+		update.VideoTitle,
+		update.ThumbnailURL,
+		update.PublishedAt,
+		update.DetectedAt,
+		update.IsSeen,
+		update.Status,
+	)
+	return err
+}
+
+func (r *Repository) GetUnseenUpdatesCount(ctx context.Context, subscriptionIDs []string) (int, error) {
+	conn, err := r.db.Conn(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer conn.Close()
+
+	query := "SELECT COUNT(*) FROM subscription_video_updates WHERE is_seen = FALSE"
+	args := []interface{}{}
+
+	if len(subscriptionIDs) > 0 {
+		placeholders := strings.Repeat("?,", len(subscriptionIDs)-1) + "?"
+		query += " AND subscription_id IN (" + placeholders + ")"
+		for _, id := range subscriptionIDs {
+			args = append(args, id)
+		}
+	}
+
+	var count int
+	err = conn.QueryRowContext(ctx, query, args...).Scan(&count)
+	return count, err
+}
+
+func (r *Repository) ListUnseenUpdates(ctx context.Context, limit int, offset int, subscriptionIDs []string) ([]data.SubscriptionVideoUpdate, error) {
+	conn, err := r.db.Conn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	var updates []data.SubscriptionVideoUpdate
+	query := "SELECT id, subscription_id, video_url, video_title, thumbnail_url, published_at, detected_at, is_seen, status FROM subscription_video_updates WHERE is_seen = FALSE"
+	args := []interface{}{}
+
+	if len(subscriptionIDs) > 0 {
+		placeholders := strings.Repeat("?,", len(subscriptionIDs)-1) + "?"
+		query += " AND subscription_id IN (" + placeholders + ")"
+		for _, id := range subscriptionIDs {
+			args = append(args, id)
+		}
+	}
+	query += " ORDER BY detected_at DESC LIMIT ? OFFSET ?"
+	args = append(args, limit, offset)
+
+	rows, err := conn.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var update data.SubscriptionVideoUpdate
+		if err := rows.Scan(
+			&update.Id,
+			&update.SubscriptionID,
+			&update.VideoURL,
+			&update.VideoTitle,
+			&update.ThumbnailURL,
+			&update.PublishedAt,
+			&update.DetectedAt,
+			&update.IsSeen,
+			&update.Status,
+		); err != nil {
+			return updates, err
+		}
+		updates = append(updates, update)
+	}
+	return updates, rows.Err()
+}
+
+func (r *Repository) MarkUpdateAsSeen(ctx context.Context, updateID string, seen bool) error {
+	conn, err := r.db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	_, err = conn.ExecContext(ctx, "UPDATE subscription_video_updates SET is_seen = ? WHERE id = ?", seen, updateID)
+	return err
+}
+
+func (r *Repository) MarkAllUpdatesAsSeen(ctx context.Context, subscriptionIDs []string, seen bool) (int64, error) {
+	conn, err := r.db.Conn(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer conn.Close()
+
+	query := "UPDATE subscription_video_updates SET is_seen = ? WHERE is_seen = ?" // Default: mark unseen (FALSE) as seen (TRUE)
+	args := []interface{}{seen, !seen} // If seen is true, we want to update where is_seen = false. If seen is false, update where is_seen = true.
+
+	if len(subscriptionIDs) > 0 {
+		placeholders := strings.Repeat("?,", len(subscriptionIDs)-1) + "?"
+		query += " AND subscription_id IN (" + placeholders + ")"
+		for _, id := range subscriptionIDs {
+			args = append(args, id)
+		}
+	}
+
+	res, err := conn.ExecContext(ctx, query, args...)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+func (r *Repository) UpdateSubscriptionUpdateStatus(ctx context.Context, updateID string, status string) error {
+	conn, err := r.db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	_, err = conn.ExecContext(ctx, "UPDATE subscription_video_updates SET status = ? WHERE id = ?", status, updateID)
+	return err
+}
+
+func (r *Repository) GetSubscriptionUpdateByVideoURL(ctx context.Context, videoURL string) (*data.SubscriptionVideoUpdate, error) {
+	conn, err := r.db.Conn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	row := conn.QueryRowContext(ctx, "SELECT id, subscription_id, video_url, video_title, thumbnail_url, published_at, detected_at, is_seen, status FROM subscription_video_updates WHERE video_url = ?", videoURL)
+	var update data.SubscriptionVideoUpdate
+	err = row.Scan(
+		&update.Id,
+		&update.SubscriptionID,
+		&update.VideoURL,
+		&update.VideoTitle,
+		&update.ThumbnailURL,
+		&update.PublishedAt,
+		&update.DetectedAt,
+		&update.IsSeen,
+		&update.Status,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // Not found
+		}
+		return nil, err
+	}
+	return &update, nil
+}
+
+func (r *Repository) DeleteSubscriptionUpdate(ctx context.Context, updateID string) error {
+	conn, err := r.db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	_, err = conn.ExecContext(ctx, "DELETE FROM subscription_video_updates WHERE id = ?", updateID)
+	return err
+}
+
+func (r *Repository) GetSubscriptionUpdate(ctx context.Context, updateID string) (*data.SubscriptionVideoUpdate, error) {
+	conn, err := r.db.Conn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	row := conn.QueryRowContext(ctx, "SELECT id, subscription_id, video_url, video_title, thumbnail_url, published_at, detected_at, is_seen, status FROM subscription_video_updates WHERE id = ?", updateID)
+	var update data.SubscriptionVideoUpdate
+	err = row.Scan(
+		&update.Id,
+		&update.SubscriptionID,
+		&update.VideoURL,
+		&update.VideoTitle,
+		&update.ThumbnailURL,
+		&update.PublishedAt,
+		&update.DetectedAt,
+		&update.IsSeen,
+		&update.Status,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // Not found
+		}
+		return nil, err
+	}
+	return &update, nil
+}

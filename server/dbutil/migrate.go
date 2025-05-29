@@ -36,6 +36,24 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 
 	if _, err := db.ExecContext(
 		ctx,
+		`CREATE TABLE IF NOT EXISTS subscription_video_updates (
+			id TEXT PRIMARY KEY,
+			subscription_id TEXT NOT NULL,
+			video_url TEXT UNIQUE NOT NULL,
+			video_title TEXT NOT NULL,
+			thumbnail_url TEXT,
+			published_at DATETIME,
+			detected_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			is_seen BOOLEAN DEFAULT FALSE,
+			status TEXT DEFAULT 'new',
+			FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE CASCADE
+		)`,
+	); err != nil {
+		return err
+	}
+
+	if _, err := db.ExecContext(
+		ctx,
 		`CREATE TABLE IF NOT EXISTS archive (
 			id CHAR(36) PRIMARY KEY,
 			title VARCHAR(255) NOT NULL,

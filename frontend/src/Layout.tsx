@@ -30,6 +30,7 @@ import Footer from './components/Footer'
 import Logout from './components/Logout'
 import SocketSubscriber from './components/SocketSubscriber'
 import DownloadNotifier from './components/notifications/DownloadNotifier';
+import SubscriptionUpdateBell from './components/notifications/SubscriptionUpdateBell'; // Import the new component
 import ThemeToggler from './components/ThemeToggler'
 import { useI18n } from './hooks/useI18n'
 import Toaster from './providers/ToasterProvider'
@@ -89,6 +90,9 @@ export default function Layout() {
             >
               {settings.appTitle}
             </Typography>
+            <SubscriptionUpdateBell /> {/* Add the bell here */}
+            <ThemeToggler /> {/* Existing component */}
+            <Logout />       {/* Existing component */}
           </Toolbar>
         </AppBar>
         <Drawer variant="permanent" open={open}>

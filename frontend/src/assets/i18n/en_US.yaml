@@ -173,3 +173,14 @@ keys:
   # Keys for Tag Filtering in MediaView
   filterByTagsLabel: "Filter by Tags"
   filterByTagsHelperText: "space-separated tags (e.g., nature outdoor)"
+  # Key for SubscriptionUpdateBell
+  newVideoUpdatesTooltip: "{count, plural, =0 {No new video updates} one {1 new video update} other {{count} new video updates}} from subscriptions"
+  # Keys for NewVideosViewer.tsx
+  newVideosPageTitle: "New Video Updates"
+  noNewVideoUpdates: "No new video updates found."
+  markAsSeenButtonLabel: "Mark as Seen"
+  viewChannelButtonLabel: "View Channel"
+  videoMarkedAsSeenToast: "Video marked as seen."
+  errorMarkingVideoAsSeenToast: "Error marking video as seen: {message}"
+  # errorFetchingUpdates is used by NewVideosViewer but not listed in this subtask; assuming it's added elsewhere or pre-existing.
+  # publishedAtLabel is used by NewVideosViewer but not listed in this subtask; assuming it's added elsewhere or pre-existing.

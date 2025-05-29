@@ -5,16 +5,25 @@ import (
 	"context"
 	"log/slog"
 	"os/exec"
-	"path/filepath"
+	// "path/filepath" // No longer directly used for archive.txt
 	"regexp"
 	"time"
+	"encoding/json" // For parsing yt-dlp JSON output
 
-	"github.com/marcopiovanello/yt-dlp-web-ui/v3/server/archive"
+	// "github.com/marcopiovanello/yt-dlp-web-ui/v3/server/archive" // No longer directly used for DownloadExists
+	archiveDomain "github.com/marcopiovanello/yt-dlp-web-ui/v3/server/archive/domain"
 	"github.com/marcopiovanello/yt-dlp-web-ui/v3/server/config"
 	"github.com/marcopiovanello/yt-dlp-web-ui/v3/server/internal"
 	"github.com/marcopiovanello/yt-dlp-web-ui/v3/server/subscription/domain"
 	"github.com/robfig/cron/v3"
+	// commonTypes "github.com/marcopiovanello/yt-dlp-web-ui/v3/server/common" // For YtdlpVideoInfo if used directly
 )
+
+// The placeholder SubscriptionUpdateService interface is no longer needed,
+// as domain.Service now includes these methods.
+// type SubscriptionUpdateService interface {
+// 	CreateSubscriptionUpdate(ctx context.Context, update *domain.SubscriptionVideoUpdate) error
+// }
 
 type TaskRunner interface {
 	Submit(subcription *domain.Subscription) error
@@ -30,22 +39,30 @@ type monitorTask struct {
 }
 
 type CronTaskRunner struct {
-	mq *internal.MessageQueue
-	db *internal.MemoryDB
+	mq             *internal.MessageQueue
+	db             *internal.MemoryDB // This was for queuing downloads, may not be needed by fetcher directly anymore for that.
+	archiveRepo    archiveDomain.Repository    // New field
+	subUpdateService domain.Service // Changed from placeholder SubscriptionUpdateService to domain.Service
 
 	tasks  chan monitorTask
 	errors chan error
-
 	running map[string]*monitorTask
 }
 
-func NewCronTaskRunner(mq *internal.MessageQueue, db *internal.MemoryDB) TaskRunner {
+func NewCronTaskRunner(
+	mq *internal.MessageQueue,
+	db *internal.MemoryDB,
+	archiveRepo archiveDomain.Repository, // New param
+	subUpdateService domain.Service, // Changed from placeholder SubscriptionUpdateService to domain.Service
+) TaskRunner {
 	return &CronTaskRunner{
-		mq:      mq,
-		db:      db,
-		tasks:   make(chan monitorTask),
-		errors:  make(chan error),
-		running: make(map[string]*monitorTask),
+		mq:              mq,
+		db:              db,
+		archiveRepo:     archiveRepo,    // Store injected repo
+		subUpdateService: subUpdateService, // Store injected service
+		tasks:           make(chan monitorTask),
+		errors:          make(chan error),
+		running:         make(map[string]*monitorTask),
 	}
 }
 
@@ -128,43 +145,75 @@ func (t *CronTaskRunner) fetcher(ctx context.Context, req *monitorTask) time.Dur
 	cmd := exec.CommandContext(
 		ctx,
 		config.Instance().DownloaderPath,
-		"-I1",
-		"--flat-playlist",
-		"--print", "webpage_url",
 		req.Subscription.URL,
+		"--dump-single-json",
+		"--flat-playlist",
+		"-I0:10", // Get info for the first 10 videos
+		"--no-warnings",
 	)
 
-	stdout, err := cmd.Output()
+	output, err := cmd.Output()
 	if err != nil {
+		slog.Error("yt-dlp command failed for subscription", "url", req.Subscription.URL, "error", err)
+		if ctxErr := ctx.Err(); ctxErr != nil { // Check if context was cancelled
+			slog.Info("Context cancelled during yt-dlp command for subscription", "url", req.Subscription.URL, "error", ctxErr)
+			return time.Duration(0) // Stop processing if context is done
+		}
+		t.errors <- err // Send other errors to the error channel
+		return nextSchedule // Return nextSchedule to attempt again later
+	}
+
+	var channelDump domain.YtdlpChannelDump
+	if err := json.Unmarshal(output, &channelDump); err != nil {
+		slog.Error("Failed to unmarshal yt-dlp JSON output for subscription", "url", req.Subscription.URL, "error", err)
 		t.errors <- err
-		return time.Duration(0)
+		return nextSchedule // Return nextSchedule
 	}
 
-	latestVideoURL := string(bytes.Trim(stdout, "\n"))
+	for _, videoEntry := range channelDump.Entries {
+		if videoEntry.WebpageURL == "" {
+			slog.Warn("Skipping video entry with empty WebpageURL", "subscriptionId", req.Subscription.Id, "title", videoEntry.Title)
+			continue
+		}
 
-	// if the download exists there's not point in sending it into the message queue.
-	exists, err := archive.DownloadExists(ctx, latestVideoURL)
-	if exists && err == nil {
-		return nextSchedule
+		exists, checkErr := t.archiveRepo.IsSourceDownloaded(ctx, videoEntry.WebpageURL)
+		if checkErr != nil {
+			slog.Error("Failed to check if video source is downloaded", "videoURL", videoEntry.WebpageURL, "error", checkErr)
+			// Potentially send to t.errors or just log and continue
+			continue
+		}
+
+		if !exists {
+			newVideoUpdate := &domain.SubscriptionVideoUpdate{
+				SubscriptionID: req.Subscription.Id,
+				VideoURL:       videoEntry.WebpageURL,
+				VideoTitle:     videoEntry.Title,
+				ThumbnailURL:   videoEntry.Thumbnail,
+				// PublishedAt will be set below
+			}
+
+			if videoEntry.UploadDate != "" {
+				parsedTime, parseErr := time.Parse("20060102", videoEntry.UploadDate)
+				if parseErr == nil {
+					newVideoUpdate.PublishedAt = parsedTime
+				} else {
+					slog.Warn("Failed to parse upload_date for video update", "date", videoEntry.UploadDate, "videoTitle", videoEntry.Title, "error", parseErr)
+					// Optionally, set PublishedAt to time.Now() or a zero value if parsing fails,
+					// or leave it as the zero value of time.Time
+				}
+			}
+
+			if createErr := t.subUpdateService.CreateSubscriptionUpdate(ctx, newVideoUpdate); createErr != nil {
+				slog.Error("Failed to create subscription video update", "videoURL", newVideoUpdate.VideoURL, "subscriptionId", req.Subscription.Id, "error", createErr)
+				// Potentially send to t.errors
+			} else {
+				slog.Info("Detected new video for subscription, update created", "channel", req.Subscription.URL, "videoTitle", newVideoUpdate.VideoTitle)
+			}
+		}
 	}
-
-	p := &internal.Process{
-		Url: latestVideoURL,
-		Params: append(
-			argsSplitterRe.FindAllString(req.Subscription.Params, 1),
-			[]string{
-				"--break-on-existing",
-				"--download-archive",
-				filepath.Join(config.Instance().Dir(), "archive.txt"),
-			}...),
-		AutoRemove: true,
-	}
-
-	t.db.Set(p)     // give it an id
-	t.mq.Publish(p) // send it to the message queue waiting to be processed
 
 	slog.Info(
-		"cron task runner next schedule",
+		"Subscription fetcher finished, next schedule",
 		slog.String("url", req.Subscription.URL),
 		slog.Any("duration", nextSchedule),
 	)
