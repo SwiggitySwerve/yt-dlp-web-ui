@@ -25,17 +25,18 @@ func (h *Handler) Exec() http.HandlerFunc {
 		var req internal.DownloadRequest
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusBadRequest, "Invalid request payload for Exec.", err) // Changed from StatusInternalServerError
+			return // Added return
 		}
 
 		id, err := h.service.Exec(req)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to execute download.", err)
 			return
 		}
 
 		if err := json.NewEncoder(w).Encode(id); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to encode Exec response.", err)
 			return
 		}
 	}
@@ -50,17 +51,18 @@ func (h *Handler) ExecPlaylist() http.HandlerFunc {
 		var req internal.DownloadRequest
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusBadRequest, "Invalid request payload for ExecPlaylist.", err) // Changed from StatusInternalServerError
+			return // Added return
 		}
 
 		err := h.service.ExecPlaylist(req)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to execute playlist download.", err)
 			return
 		}
 
 		if err := json.NewEncoder(w).Encode("ok"); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to encode ExecPlaylist response.", err)
 			return
 		}
 	}
@@ -75,14 +77,14 @@ func (h *Handler) ExecLivestream() http.HandlerFunc {
 		var req internal.DownloadRequest
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusBadRequest, "Invalid request payload for ExecLivestream.", err)
 			return
 		}
 
-		h.service.ExecLivestream(req)
+		h.service.ExecLivestream(req) // Assuming ExecLivestream logs its own errors if critical, or doesn't return one to handler
 
 		if err := json.NewEncoder(w).Encode("ok"); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to encode ExecLivestream response.", err)
 			return
 		}
 	}
@@ -96,12 +98,12 @@ func (h *Handler) Running() http.HandlerFunc {
 
 		res, err := h.service.Running(r.Context())
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to get running processes.", err)
 			return
 		}
 
 		if err := json.NewEncoder(w).Encode(res); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to encode running processes response.", err)
 			return
 		}
 	}
@@ -113,7 +115,7 @@ func (h *Handler) GetCookies() http.HandlerFunc {
 
 		cookies, err := h.service.GetCookies(r.Context())
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to get cookies.", err)
 			return
 		}
 
@@ -122,7 +124,7 @@ func (h *Handler) GetCookies() http.HandlerFunc {
 		}
 
 		if err := json.NewEncoder(w).Encode(res); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to encode get cookies response.", err)
 			return
 		}
 	}
@@ -137,17 +139,17 @@ func (h *Handler) SetCookies() http.HandlerFunc {
 		req := new(internal.SetCookiesRequest)
 
 		if err := json.NewDecoder(r.Body).Decode(req); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			RespondWithErrorJSON(w, http.StatusBadRequest, "Invalid request payload for SetCookies.", err)
 			return
 		}
 
 		if err := h.service.SetCookies(r.Context(), req.Cookies); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to set cookies.", err)
 			return
 		}
 
 		if err := json.NewEncoder(w).Encode("ok"); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to encode SetCookies response.", err)
 			return
 		}
 	}
@@ -158,12 +160,12 @@ func (h *Handler) DeleteCookies() http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 
 		if err := h.service.SetCookies(r.Context(), ""); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to delete cookies.", err)
 			return
 		}
 
 		if err := json.NewEncoder(w).Encode("ok"); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to encode DeleteCookies response.", err)
 			return
 		}
 	}
@@ -178,22 +180,22 @@ func (h *Handler) AddTemplate() http.HandlerFunc {
 		req := new(internal.CustomTemplate)
 
 		if err := json.NewDecoder(r.Body).Decode(req); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			RespondWithErrorJSON(w, http.StatusBadRequest, "Invalid request payload for AddTemplate.", err)
 			return
 		}
 
 		if req.Name == "" || req.Content == "" {
-			http.Error(w, "Invalid template", http.StatusBadRequest)
+			RespondWithErrorJSON(w, http.StatusBadRequest, "Invalid template: name and content are required.", nil)
 			return
 		}
 
 		if err := h.service.SaveTemplate(r.Context(), req); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to save template.", err)
 			return
 		}
 
 		if err := json.NewEncoder(w).Encode("ok"); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to encode AddTemplate response.", err)
 			return
 		}
 	}
@@ -207,13 +209,13 @@ func (h *Handler) GetTemplates() http.HandlerFunc {
 
 		templates, err := h.service.GetTemplates(r.Context())
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to get templates.", err)
 			return
 		}
 
 		err = json.NewEncoder(w).Encode(templates)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to encode GetTemplates response.", err)
 		}
 	}
 }
@@ -227,19 +229,19 @@ func (h *Handler) UpdateTemplate() http.HandlerFunc {
 		req := &internal.CustomTemplate{}
 
 		if err := json.NewDecoder(r.Body).Decode(req); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusBadRequest, "Invalid request payload for UpdateTemplate.", err) // Changed to StatusBadRequest
 			return
 		}
 
 		res, err := h.service.UpdateTemplate(r.Context(), req)
 
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to update template.", err)
 			return
 		}
 
 		if err := json.NewEncoder(w).Encode(res); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to encode UpdateTemplate response.", err)
 			return
 		}
 	}
@@ -254,12 +256,12 @@ func (h *Handler) DeleteTemplate() http.HandlerFunc {
 		id := chi.URLParam(r, "id")
 
 		if err := h.service.DeleteTemplate(r.Context(), id); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to delete template.", err)
 			return
 		}
 
 		if err := json.NewEncoder(w).Encode("ok"); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to encode DeleteTemplate response.", err)
 			return
 		}
 	}
@@ -278,7 +280,7 @@ func (h *Handler) GetVersion() http.HandlerFunc {
 
 		rpcVersion, ytdlpVersion, err := h.service.GetVersion(r.Context())
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to get version information.", err)
 			return
 		}
 
@@ -288,7 +290,7 @@ func (h *Handler) GetVersion() http.HandlerFunc {
 		}
 
 		if err := json.NewEncoder(w).Encode(res); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to encode version information response.", err)
 			return
 		}
 	}

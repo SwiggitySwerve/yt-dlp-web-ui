@@ -120,9 +120,9 @@ export const router = createHashRouter([
             <ActiveDownloadsViewer />
           </Suspense>
         ),
-        errorElement: ( 
+        errorElement: (
           <Suspense fallback={<CircularProgress />}>
-            <ErrorBoundary /> 
+            <ErrorBoundary />
           </Suspense>
         )
       },

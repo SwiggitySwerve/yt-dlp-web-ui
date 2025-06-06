@@ -19,6 +19,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/marcopiovanello/yt-dlp-web-ui/v3/server/config"
 	"github.com/marcopiovanello/yt-dlp-web-ui/v3/server/internal"
+	"github.com/marcopiovanello/yt-dlp-web-ui/v3/server/rest" // Import for RespondWithErrorJSON
 )
 
 /*
@@ -92,13 +93,13 @@ func ListDownloaded(w http.ResponseWriter, r *http.Request) {
 	req := new(ListRequest)
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		rest.RespondWithErrorJSON(w, http.StatusBadRequest, "Invalid request payload for listing files.", err)
 		return
 	}
 
 	files, err := walkDir(filepath.Join(root, req.SubDir))
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		rest.RespondWithErrorJSON(w, http.StatusBadRequest, "Error reading directory.", err) // Or InternalServerError depending on expected errors
 		return
 	}
 
@@ -111,7 +112,7 @@ func ListDownloaded(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
 	if err := json.NewEncoder(w).Encode(files); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		rest.RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to encode file list response.", err)
 	}
 }
 
@@ -121,12 +122,12 @@ func DeleteFile(w http.ResponseWriter, r *http.Request) {
 	req := new(DeleteRequest)
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		rest.RespondWithErrorJSON(w, http.StatusBadRequest, "Invalid request payload for deleting file.", err)
 		return
 	}
 
 	if err := os.Remove(req.Path); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		rest.RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to delete file.", err) // Changed to InternalServerError as os.Remove can fail for various reasons
 		return
 	}
 
@@ -138,19 +139,19 @@ func SendFile(w http.ResponseWriter, r *http.Request) {
 	path := chi.URLParam(r, "id")
 
 	if path == "" {
-		http.Error(w, "inexistent path", http.StatusBadRequest)
+		rest.RespondWithErrorJSON(w, http.StatusBadRequest, "File path is required.", nil)
 		return
 	}
 
 	path, err := url.QueryUnescape(path)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		rest.RespondWithErrorJSON(w, http.StatusBadRequest, "Invalid URL path encoding.", err)
 		return
 	}
 
 	decoded, err := base64.StdEncoding.DecodeString(path)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		rest.RespondWithErrorJSON(w, http.StatusBadRequest, "Invalid base64 encoding in path.", err)
 		return
 	}
 
@@ -170,19 +171,19 @@ func DownloadFile(w http.ResponseWriter, r *http.Request) {
 	path := chi.URLParam(r, "id")
 
 	if path == "" {
-		http.Error(w, "inexistent path", http.StatusBadRequest)
+		rest.RespondWithErrorJSON(w, http.StatusBadRequest, "File path is required for download.", nil)
 		return
 	}
 
 	path, err := url.QueryUnescape(path)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		rest.RespondWithErrorJSON(w, http.StatusBadRequest, "Invalid URL path encoding for download.", err)
 		return
 	}
 
 	decoded, err := base64.StdEncoding.DecodeString(path)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		rest.RespondWithErrorJSON(w, http.StatusBadRequest, "Invalid base64 encoding in path for download.", err)
 		return
 	}
 
@@ -196,11 +197,11 @@ func DownloadFile(w http.ResponseWriter, r *http.Request) {
 
 		fd, err := os.Open(filename)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			rest.RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to open file for download.", err)
 			return
 		}
 
-		io.Copy(w, fd)
+		io.Copy(w, fd) // If io.Copy fails, it's hard to send a JSON error as headers might be sent.
 		return
 	}
 
@@ -228,24 +229,31 @@ func BulkDownload(mdb *internal.MemoryDB) http.HandlerFunc {
 		for _, p := range ps {
 			wr, err := zipWriter.Create(filepath.Base(p.Output.SavedFilePath))
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				// Difficult to send JSON error here as headers for zip are likely sent. Log and return.
+				slog.Error("Failed to create zip entry", "file", p.Output.SavedFilePath, "error", err)
+				// We can't use RespondWithErrorJSON effectively if headers are already written.
 				return
 			}
 
 			fd, err := os.Open(p.Output.SavedFilePath)
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				slog.Error("Failed to open file for zipping", "file", p.Output.SavedFilePath, "error", err)
+				// We can't use RespondWithErrorJSON effectively if headers are already written.
 				return
 			}
 
 			if _, err := io.Copy(wr, fd); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				slog.Error("Failed to copy file to zip", "file", p.Output.SavedFilePath, "error", err)
+				// We can't use RespondWithErrorJSON effectively if headers are already written.
 				return
 			}
+			fd.Close() // Close the file descriptor
 		}
 
 		if err := zipWriter.Close(); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			// Difficult to send JSON error here. Log and return.
+			slog.Error("Failed to close zip writer", "error", err)
+			// We can't use RespondWithErrorJSON effectively if headers are already written.
 			return
 		}
 	}

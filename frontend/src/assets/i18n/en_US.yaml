@@ -184,3 +184,12 @@ keys:
   errorMarkingVideoAsSeenToast: "Error marking video as seen: {message}"
   # errorFetchingUpdates is used by NewVideosViewer but not listed in this subtask; assuming it's added elsewhere or pre-existing.
   # publishedAtLabel is used by NewVideosViewer but not listed in this subtask; assuming it's added elsewhere or pre-existing.
+  # Keys for ApiErrorDisplay.tsx
+  errorOccurredTitle: "An Error Occurred"
+  genericApiError: "A generic error occurred. Please try again."
+  showErrorDetailsButton: "Details"
+  hideErrorDetailsButton: "Hide Details"
+  # Keys for ApiErrorDisplay integration in views
+  errorLoadingMediaTitle: "Could not load media library"
+  errorFetchingNewVideosTitle: "Could not fetch new video updates"
+  errorLoadingSubscriptionsTitle: "Could not load subscriptions"

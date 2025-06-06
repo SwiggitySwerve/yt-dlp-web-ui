@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/websocket"
+	"github.com/marcopiovanello/yt-dlp-web-ui/v3/server/rest" // Import for RespondWithErrorJSON
 )
 
 var upgrader = websocket.Upgrader{
@@ -17,7 +18,7 @@ var upgrader = websocket.Upgrader{
 func WebSocket(w http.ResponseWriter, r *http.Request) {
 	c, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		rest.RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to upgrade WebSocket connection.", err)
 		return
 	}
 
@@ -36,7 +37,10 @@ func WebSocket(w http.ResponseWriter, r *http.Request) {
 
 		writer, err := c.NextWriter(mtype)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			// Note: It's tricky to send a JSON error response over a WebSocket that's failing at the NextWriter stage.
+			// The connection might already be compromised. Logging is important.
+			// For consistency, we'll call RespondWithErrorJSON, but it might not reach the client.
+			rest.RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to get WebSocket writer.", err)
 			break
 		}
 
@@ -52,7 +56,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 	_, err := io.Copy(w, res)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		rest.RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to write JSON-RPC response.", err)
 		return
 	}
 }

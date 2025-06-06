@@ -41,10 +41,10 @@ const SubscriptionUpdateBell: React.FC = () => {
     console.log('SubscriptionUpdateBell clicked. Navigating to /new_videos_updates (placeholder).');
     // For now, this is a placeholder. In a future step, it will navigate to a dedicated view or open a modal.
     // Example navigation (uncomment and adjust path when ready):
-    // navigate('/new_videos_updates'); 
+    // navigate('/new_videos_updates');
     // Or, if opening a modal, trigger modal state here.
     // For now, let's just reset count locally for demo purposes, actual reset should happen when user views updates
-    // setUnseenCount(0); 
+    // setUnseenCount(0);
     navigate('/new_videos_updates'); // Navigate to the new view
   };
 

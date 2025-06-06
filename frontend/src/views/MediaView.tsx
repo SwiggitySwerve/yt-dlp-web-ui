@@ -6,7 +6,8 @@ import { ArchiveEntry, PaginatedResponse } from '../types';
 import { Container, Grid, Typography, CircularProgress, Box, TablePagination, Select, MenuItem, FormControl, InputLabel, TextField, Button } from '@mui/material';
 import { useI18n } from '../hooks/useI18n';
 import MediaCard from '../components/media/MediaCard';
-import MediaDetailModal from '../components/media/MediaDetailModal'; // Import MediaDetailModal
+import MediaDetailModal from '../components/media/MediaDetailModal';
+import ApiErrorDisplay from '../components/core/ApiErrorDisplay'; // Import ApiErrorDisplay
 
 export default function MediaView() {
   const { i18n } = useI18n();
@@ -106,7 +107,7 @@ export default function MediaView() {
   if (error) {
     return (
       <Container maxWidth="xl" sx={{ mt: 2, mb: 8 }}>
-        <Typography color="error">{i18n.t('errorLoadingMedia')}: {error.message}</Typography>
+        <ApiErrorDisplay error={error} title={i18n.t('errorLoadingMediaTitle')} />
       </Container>
     );
   }

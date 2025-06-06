@@ -84,16 +84,13 @@ func (h *Handler) List() http.HandlerFunc { // Using Handler
 
 		res, err := h.service.List(r.Context(), startRowId, limit, sortByParam, filters, searchQueryParam)
 		if err != nil {
-			slog.Error("Error from archive service List", "error", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to retrieve archive list.", err)
 			return
 		}
 
 		if err := json.NewEncoder(w).Encode(res); err != nil {
-			slog.Error("Failed to encode archive list response", "error", err)
-			// Consider returning http.Error here as well
-			http.Error(w, "Failed to encode response", http.StatusInternalServerError) // Added error response
-			return // Added return
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to encode archive list response.", err)
+			return
 		}
 	}
 }
@@ -125,13 +122,13 @@ func (h *Handler) Archive() http.HandlerFunc {
 		var req domain.ArchiveEntry
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			RespondWithErrorJSON(w, http.StatusBadRequest, "Invalid request payload.", err)
 			return
 		}
 
 		err := h.service.Archive(r.Context(), &req)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to archive entry.", err)
 			return
 		}
 
@@ -149,16 +146,16 @@ func (h *Handler) HardDelete() http.HandlerFunc {
 
 		res, err := h.service.HardDelete(r.Context(), id)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to hard delete entry.", err)
 			return
 		}
 		if res == nil { // Handle not found case if service returns nil for that
-			http.Error(w, "Entry not found", http.StatusNotFound)
+			RespondWithErrorJSON(w, http.StatusNotFound, "Entry not found for hard deletion.", nil) // No detailError if service signals not found cleanly
 			return
 		}
 
 		if err := json.NewEncoder(w).Encode(res); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to encode hard delete response.", err)
 			return
 		}
 	}
@@ -174,16 +171,16 @@ func (h *Handler) SoftDelete() http.HandlerFunc {
 
 		res, err := h.service.SoftDelete(r.Context(), id)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to soft delete entry.", err)
 			return
 		}
 		if res == nil { // Handle not found case
-			http.Error(w, "Entry not found", http.StatusNotFound)
+			RespondWithErrorJSON(w, http.StatusNotFound, "Entry not found for soft deletion.", nil) // No detailError if service signals not found cleanly
 			return
 		}
 
 		if err := json.NewEncoder(w).Encode(res); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to encode soft delete response.", err)
 			return
 		}
 	}
@@ -202,12 +199,12 @@ func (h *Handler) GetCursor() http.HandlerFunc {
 
 		cursorId, err := h.service.GetCursor(r.Context(), id)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			RespondWithErrorJSON(w, http.StatusBadRequest, "Failed to get cursor.", err) // Or InternalServerError depending on expected GetCursor errors
 			return
 		}
 
 		if err := json.NewEncoder(w).Encode(cursorId); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to encode cursor response.", err)
 			return
 		}
 	}

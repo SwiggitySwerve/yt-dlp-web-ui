@@ -8,6 +8,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/marcopiovanello/yt-dlp-web-ui/v3/server/config"
+	"github.com/marcopiovanello/yt-dlp-web-ui/v3/server/rest" // Import for RespondWithErrorJSON
 )
 
 const TOKEN_COOKIE_NAME = "jwt-yt-dlp-webui"
@@ -21,7 +22,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	var req LoginRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		rest.RespondWithErrorJSON(w, http.StatusBadRequest, "Invalid login request payload.", err) // Changed from StatusInternalServerError
 		return
 	}
 
@@ -31,7 +32,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if username != req.Username || password != req.Password {
-		http.Error(w, "invalid username or password", http.StatusBadRequest)
+		rest.RespondWithErrorJSON(w, http.StatusUnauthorized, "Invalid username or password.", nil) // Changed from StatusBadRequest
 		return
 	}
 
@@ -44,12 +45,12 @@ func Login(w http.ResponseWriter, r *http.Request) {
 
 	tokenString, err := token.SignedString([]byte(os.Getenv("JWT_SECRET")))
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		rest.RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to sign JWT token.", err)
 		return
 	}
 
 	if err := json.NewEncoder(w).Encode(tokenString); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		rest.RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to encode JWT token response.", err)
 		return
 	}
 }

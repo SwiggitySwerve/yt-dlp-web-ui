@@ -38,7 +38,7 @@ const DownloadNotifier: React.FC = () => {
           pushMessage(i18n.t('downloadCompletedNotif', { title }), 'success');
           currentNotified[id] = 'completed';
         }
-      } 
+      }
       // Check for errored status (status code 3 or string 'errored')
       else if (status === 3 || status === 'errored') {
         if (currentNotified[id] !== 'errored') {

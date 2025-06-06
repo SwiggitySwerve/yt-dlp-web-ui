@@ -20,11 +20,12 @@ import NoSubscriptions from '../components/subscriptions/NoSubscriptions'
 import SubscriptionsDialog from '../components/subscriptions/SubscriptionsDialog'
 import SubscriptionsEditDialog from '../components/subscriptions/SubscriptionsEditDialog'
 import SubscriptionsSpeedDial from '../components/subscriptions/SubscriptionsSpeedDial'
-import ChannelVideosView from '../components/subscriptions/ChannelVideosView'; // Added import
+import ChannelVideosView from '../components/subscriptions/ChannelVideosView';
 import { useToast } from '../hooks/toast'
 import useFetch from '../hooks/useFetch'
 import { useI18n } from '../hooks/useI18n'
 import { ffetch } from '../lib/httpClient'
+import ApiErrorDisplay from '../components/core/ApiErrorDisplay'; // Import ApiErrorDisplay
 import { Subscription } from '../services/subscriptions'
 import { PaginatedResponse, YtdlpChannelDump } from '../types' // Added YtdlpChannelDump
 
@@ -46,11 +47,11 @@ const SubscriptionsView: React.FC = () => {
   const [channelVideosData, setChannelVideosData] = useState<YtdlpChannelDump | null>(null);
   const [isLoadingChannelVideos, setIsLoadingChannelVideos] = useState<boolean>(false);
 
-  const { data: subs, fetcher: refecth } = useFetch<PaginatedResponse<Subscription[]>>(
+  const { data: subs, isLoading: isLoadingSubs, error: errorSubs, fetcher: refecth } = useFetch<PaginatedResponse<Subscription[]>>( // Destructure isLoading and error
     `/subscriptions?id=${startId}&limit=${limit}`
   )
 
-  const [isPending, startTransition] = useTransition()
+  const [isPending, startTransition] = useTransition();
 
   const handleViewVideos = async (id: string) => {
     setViewingSubscriptionId(id);
@@ -93,7 +94,7 @@ const SubscriptionsView: React.FC = () => {
 
   return (
     <>
-      <LoadingBackdrop isLoading={!subs || isPending} />
+      <LoadingBackdrop isLoading={isLoadingSubs || isPending} /> {/* Use isLoadingSubs */}
 
       <SubscriptionsSpeedDial onOpen={() => setOpenDialog(s => !s)} />
 
@@ -109,10 +110,18 @@ const SubscriptionsView: React.FC = () => {
         refecth()
       }} />
 
-      {!subs || subs.data.length === 0 ?
-        <NoSubscriptions /> :
+      {/* Error display for main subscriptions list */}
+      {errorSubs && !isLoadingSubs && (
         <Container maxWidth="xl" sx={{ mt: 4, mb: 8 }}>
-          <Paper sx={{
+          <ApiErrorDisplay error={errorSubs} title={i18n.t('errorLoadingSubscriptionsTitle')} />
+        </Container>
+      )}
+
+      {!errorSubs && !isLoadingSubs && (!subs || subs.data.length === 0) ? // Adjusted condition
+        <NoSubscriptions /> :
+        !errorSubs && subs && subs.data.length > 0 && ( // Render table only if no error and data exists
+          <Container maxWidth="xl" sx={{ mt: 4, mb: 8 }}>
+            <Paper sx={{
             p: 2.5,
             display: 'flex',
             flexDirection: 'column',
@@ -172,19 +181,6 @@ const SubscriptionsView: React.FC = () => {
               </Table>
             </TableContainer>
 
-            {/* Display area for channel videos - Replaced with ChannelVideosView */}
-            {viewingSubscriptionId && (
-              <ChannelVideosView
-                isLoading={isLoadingChannelVideos}
-                channelData={channelVideosData}
-                onClose={() => {
-                  setViewingSubscriptionId(null);
-                  setChannelVideosData(null);
-                }}
-              />
-            )}
-            {/* End display area */}
-
             <TablePagination
               component="div"
               count={-1}
@@ -203,7 +199,21 @@ const SubscriptionsView: React.FC = () => {
               onRowsPerPageChange={(e) => { setLimit(parseInt(e.target.value)) }}
             />
           </Paper>
+          {/* Display area for channel videos - Placed outside the main Paper if it's a separate section */}
+          {viewingSubscriptionId && (
+            <Box sx={{ mt: 3 }}> {/* Add some margin if it's outside the main Paper */}
+              <ChannelVideosView
+                isLoading={isLoadingChannelVideos}
+                channelData={channelVideosData}
+                onClose={() => {
+                  setViewingSubscriptionId(null);
+                  setChannelVideosData(null);
+                }}
+              />
+            </Box>
+          )}
         </Container>
+        )
       }
     </>
   )

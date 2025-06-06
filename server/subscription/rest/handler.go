@@ -50,8 +50,7 @@ func (h *RestHandler) GetChannelVideos() http.HandlerFunc {
 
 		subscriptionID := chi.URLParam(r, "id")
 		if subscriptionID == "" {
-			slog.Error("Subscription ID is missing in path")
-			http.Error(w, "Subscription ID is required", http.StatusBadRequest)
+			RespondWithErrorJSON(w, http.StatusBadRequest, "Subscription ID is required.", nil)
 			return
 		}
 
@@ -59,16 +58,14 @@ func (h *RestHandler) GetChannelVideos() http.HandlerFunc {
 
 		channelDump, err := h.svc.GetChannelVideos(r.Context(), subscriptionID)
 		if err != nil {
-			slog.Error("Error from GetChannelVideos service", "subscriptionID", subscriptionID, "error", err)
-			// Distinguish between "not found" and other errors if possible
-			// For now, generic internal server error.
-			http.Error(w, "Failed to get channel videos: "+err.Error(), http.StatusInternalServerError)
+			// Assuming GetChannelVideos might return a specific error type for "not found"
+			// For now, using a generic message and relying on slog for details.
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to get channel videos.", err)
 			return
 		}
 
 		if err := json.NewEncoder(w).Encode(channelDump); err != nil {
-			slog.Error("Failed to encode channel videos response", "subscriptionID", subscriptionID, "error", err)
-			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to encode channel videos response.", err)
 			return
 		}
 	}
@@ -84,12 +81,12 @@ func (h *RestHandler) Delete() http.HandlerFunc {
 
 		err := h.svc.Delete(r.Context(), id)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to delete subscription.", err)
 			return
 		}
 
 		if err := json.NewEncoder(w).Encode("ok"); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to encode delete subscription response.", err)
 			return
 		}
 	}
@@ -105,12 +102,12 @@ func (h *RestHandler) GetCursor() http.HandlerFunc {
 
 		cursorId, err := h.svc.GetCursor(r.Context(), id)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			RespondWithErrorJSON(w, http.StatusBadRequest, "Failed to get cursor for subscription.", err)
 			return
 		}
 
 		if err := json.NewEncoder(w).Encode(cursorId); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to encode cursor response.", err)
 			return
 		}
 	}
@@ -139,12 +136,12 @@ func (h *RestHandler) List() http.HandlerFunc {
 
 		res, err := h.svc.List(r.Context(), int64(start), limit)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to list subscriptions.", err)
 			return
 		}
 
 		if err := json.NewEncoder(w).Encode(res); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to encode list subscriptions response.", err)
 			return
 		}
 	}
@@ -159,18 +156,18 @@ func (h *RestHandler) Submit() http.HandlerFunc {
 		var req domain.Subscription
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			RespondWithErrorJSON(w, http.StatusBadRequest, "Invalid request payload for submitting subscription.", err)
 			return
 		}
 
 		res, err := h.svc.Submit(r.Context(), &req)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to submit subscription.", err)
 			return
 		}
 
 		if err := json.NewEncoder(w).Encode(res); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to encode submit subscription response.", err)
 			return
 		}
 	}
@@ -185,17 +182,17 @@ func (h *RestHandler) UpdateByExample() http.HandlerFunc {
 		var req domain.Subscription
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			RespondWithErrorJSON(w, http.StatusBadRequest, "Invalid request payload for updating subscription.", err)
 			return
 		}
 
 		if err := h.svc.UpdateByExample(r.Context(), &req); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to update subscription.", err)
 			return
 		}
 
 		if err := json.NewEncoder(w).Encode(req); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to encode update subscription response.", err)
 			return
 		}
 	}
@@ -233,14 +230,12 @@ func (h *RestHandler) ListUpdates() http.HandlerFunc {
 		slog.Info("Handler: ListUpdates called", "limit", limit, "offset", offset, "subscriptionIDs", parsedSubscriptionIDs)
 		updates, err := h.svc.ListUnseenUpdates(r.Context(), limit, offset, parsedSubscriptionIDs)
 		if err != nil {
-			slog.Error("Error from ListUnseenUpdates service", "error", err)
-			http.Error(w, "Failed to list updates: "+err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to list subscription updates.", err)
 			return
 		}
 
 		if err := json.NewEncoder(w).Encode(updates); err != nil {
-			slog.Error("Failed to encode updates list response", "error", err)
-			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to encode subscription updates list response.", err)
 		}
 	}
 }
@@ -255,18 +250,16 @@ func (h *RestHandler) GetUnseenUpdatesCount() http.HandlerFunc {
 		if subIDsParam != "" {
 			parsedSubscriptionIDs = strings.Split(subIDsParam, ",")
 		}
-		
+
 		slog.Info("Handler: GetUnseenUpdatesCount called", "subscriptionIDs", parsedSubscriptionIDs)
 		count, err := h.svc.GetUnseenUpdatesCount(r.Context(), parsedSubscriptionIDs)
 		if err != nil {
-			slog.Error("Error from GetUnseenUpdatesCount service", "error", err)
-			http.Error(w, "Failed to get unseen updates count: "+err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to get unseen subscription updates count.", err)
 			return
 		}
 
 		if err := json.NewEncoder(w).Encode(map[string]int{"count": count}); err != nil {
-			slog.Error("Failed to encode unseen updates count response", "error", err)
-			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to encode unseen subscription updates count response.", err)
 		}
 	}
 }
@@ -278,8 +271,7 @@ func (h *RestHandler) MarkUpdateSeen() http.HandlerFunc {
 
 		updateID := chi.URLParam(r, "updateID")
 		if updateID == "" {
-			slog.Error("Update ID is missing in path for MarkUpdateSeen")
-			http.Error(w, "Update ID is required", http.StatusBadRequest)
+			RespondWithErrorJSON(w, http.StatusBadRequest, "Update ID is required.", nil)
 			return
 		}
 
@@ -287,16 +279,14 @@ func (h *RestHandler) MarkUpdateSeen() http.HandlerFunc {
 			Seen bool `json:"seen"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
-			slog.Error("Failed to decode request body for MarkUpdateSeen", "error", err)
-			http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+			RespondWithErrorJSON(w, http.StatusBadRequest, "Invalid request payload for marking update as seen.", err)
 			return
 		}
-		
+
 		slog.Info("Handler: MarkUpdateSeen called", "updateID", updateID, "seen", reqBody.Seen)
 		err := h.svc.MarkUpdateAsSeen(r.Context(), updateID, reqBody.Seen)
 		if err != nil {
-			slog.Error("Error from MarkUpdateAsSeen service", "updateID", updateID, "error", err)
-			http.Error(w, "Failed to mark update as seen: "+err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to mark subscription update as seen.", err)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
@@ -319,16 +309,14 @@ func (h *RestHandler) MarkAllUpdatesSeen() http.HandlerFunc {
 			Seen bool `json:"seen"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
-			slog.Error("Failed to decode request body for MarkAllUpdatesSeen", "error", err)
-			http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+			RespondWithErrorJSON(w, http.StatusBadRequest, "Invalid request payload for marking all updates as seen.", err)
 			return
 		}
-		
+
 		slog.Info("Handler: MarkAllUpdatesSeen called", "subscriptionIDs", parsedSubscriptionIDs, "seen", reqBody.Seen)
 		affectedCount, err := h.svc.MarkAllUpdatesAsSeen(r.Context(), parsedSubscriptionIDs, reqBody.Seen)
 		if err != nil {
-			slog.Error("Error from MarkAllUpdatesAsSeen service", "error", err)
-			http.Error(w, "Failed to mark all updates as seen: "+err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to mark all subscription updates as seen.", err)
 			return
 		}
 		json.NewEncoder(w).Encode(map[string]interface{}{"message": "All updates marked as seen successfully", "affected_count": affectedCount})
@@ -342,30 +330,26 @@ func (h *RestHandler) DownloadUpdate() http.HandlerFunc {
 
 		updateID := chi.URLParam(r, "updateID")
 		if updateID == "" {
-			slog.Error("Update ID is missing in path for DownloadUpdate")
-			http.Error(w, "Update ID is required", http.StatusBadRequest)
+			RespondWithErrorJSON(w, http.StatusBadRequest, "Update ID is required for download.", nil)
 			return
 		}
-		
+
 		slog.Info("Handler: DownloadUpdate called", "updateID", updateID)
 
-		// Assuming h.svc has GetSubscriptionUpdate method (added to domain.Service in Turn 54)
 		videoUpdate, err := h.svc.GetSubscriptionUpdate(r.Context(), updateID)
 		if err != nil {
-			slog.Error("Error from GetSubscriptionUpdate service", "updateID", updateID, "error", err)
-			http.Error(w, "Failed to get video update details: "+err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to get video update details for download.", err)
 			return
 		}
 		if videoUpdate == nil {
-			slog.Error("Video update not found", "updateID", updateID)
-			http.Error(w, "Video update not found", http.StatusNotFound)
+			RespondWithErrorJSON(w, http.StatusNotFound, "Video update not found for download.", nil)
 			return
 		}
 
 		p := &internal.Process{
 			Url:        videoUpdate.VideoURL,
 			Params:     []string{}, // Placeholder: Consider how to get relevant params
-			AutoRemove: false,      
+			AutoRemove: false,
 		}
 		h.memDB.Set(p)  // Generate ID for the process
 		h.mq.Publish(p) // Queue for download
@@ -387,16 +371,14 @@ func (h *RestHandler) DeleteUpdate() http.HandlerFunc {
 
 		updateID := chi.URLParam(r, "updateID")
 		if updateID == "" {
-			slog.Error("Update ID is missing in path for DeleteUpdate")
-			http.Error(w, "Update ID is required", http.StatusBadRequest)
+			RespondWithErrorJSON(w, http.StatusBadRequest, "Update ID is required for deletion.", nil)
 			return
 		}
-		
+
 		slog.Info("Handler: DeleteUpdate called", "updateID", updateID)
 		err := h.svc.DeleteSubscriptionUpdate(r.Context(), updateID)
 		if err != nil {
-			slog.Error("Error from DeleteSubscriptionUpdate service", "updateID", updateID, "error", err)
-			http.Error(w, "Failed to delete update: "+err.Error(), http.StatusInternalServerError)
+			RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to delete subscription update.", err)
 			return
 		}
 		w.WriteHeader(http.StatusOK)

@@ -118,10 +118,10 @@ const ActiveDownloadsViewer: React.FC = () => {
                       </Box>
                     )}
                     <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>
-                      {i18n.t('downloadProgressLabel', { 
-                        percentage: download.progress?.percentage || 'N/A', 
-                        speed: download.progress?.speed || 'N/A', 
-                        eta: download.progress?.eta || 'N/A' 
+                      {i18n.t('downloadProgressLabel', {
+                        percentage: download.progress?.percentage || 'N/A',
+                        speed: download.progress?.speed || 'N/A',
+                        eta: download.progress?.eta || 'N/A'
                       })}
                     </Typography>
                   </CardContent>

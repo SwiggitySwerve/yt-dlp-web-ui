@@ -13,6 +13,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/marcopiovanello/yt-dlp-web-ui/v3/server/config"
 	"golang.org/x/oauth2"
+
+	"github.com/marcopiovanello/yt-dlp-web-ui/v3/server/rest" // Import for RespondWithErrorJSON
 )
 
 type OAuth2SuccessResponse struct {
@@ -133,7 +135,7 @@ func SingIn(w http.ResponseWriter, r *http.Request) {
 		})
 	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		rest.RespondWithErrorJSON(w, http.StatusBadRequest, "OpenID Connect sign-in failed.", err)
 		return
 	}
 
@@ -147,7 +149,7 @@ func Refresh(w http.ResponseWriter, r *http.Request) {
 
 	token, err := ts.Token()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		rest.RespondWithErrorJSON(w, http.StatusBadRequest, "Failed to refresh OpenID Connect token.", err)
 		return
 	}
 
@@ -163,7 +165,7 @@ func Refresh(w http.ResponseWriter, r *http.Request) {
 	token.AccessToken = "*redacted*"
 
 	if err := json.NewEncoder(w).Encode(token); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		rest.RespondWithErrorJSON(w, http.StatusInternalServerError, "Failed to encode refreshed token response.", err)
 		return
 	}
 }

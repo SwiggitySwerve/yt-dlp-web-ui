@@ -20,9 +20,10 @@ import MovieIcon from '@mui/icons-material/Movie'; // Placeholder for missing th
 
 import { useI18n } from '../hooks/useI18n';
 import { useToast } from '../hooks/toast';
-import { SubscriptionVideoUpdate } from '../types'; // Assuming type is in 'types/index.ts'
+import { SubscriptionVideoUpdate } from '../types';
 import { ffetch } from '../lib/httpClient';
 import { useNavigate } from 'react-router-dom';
+import ApiErrorDisplay from '../components/core/ApiErrorDisplay'; // Import ApiErrorDisplay
 import { useAtomValue } from 'jotai';
 import { serverURL } from '../atoms/settings';
 import { formatDate } from '../utils'; // Assuming formatDate exists
@@ -35,29 +36,29 @@ const NewVideosViewer: React.FC = () => {
 
   const [updates, setUpdates] = useState<SubscriptionVideoUpdate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<any | null>(null); // Changed error state to any
 
   const fetchUpdates = useCallback(async () => {
     if (!apiBaseURL) {
         setIsLoading(false);
-        setError("Server URL not configured.");
+        setError({ message: "Server URL not configured." }); // Store as an error-like object
         return;
     }
     setIsLoading(true);
     setError(null);
     try {
-      // Adjust endpoint as needed, e.g., to fetch only unseen or paginate
       const response = await ffetch<SubscriptionVideoUpdate[]>(`${apiBaseURL}/api/subscriptions/updates?seen=false&limit=50`);
       if (Array.isArray(response)) {
         setUpdates(response);
       } else {
         console.error('Invalid response structure from /api/subscriptions/updates:', response);
         setUpdates([]);
-        setError(i18n.t('errorFetchingUpdates', { message: 'Invalid response format' }));
+        // Store an error-like object for ApiErrorDisplay
+        setError({ message: i18n.t('errorFetchingUpdates', { message: 'Invalid response format' }) });
       }
     } catch (err: any) {
       console.error('Failed to fetch new video updates:', err);
-      setError(i18n.t('errorFetchingUpdates', { message: err.message || 'Unknown error' }));
+      setError(err); // Store the raw error object
       setUpdates([]);
     } finally {
       setIsLoading(false);
@@ -115,7 +116,7 @@ const NewVideosViewer: React.FC = () => {
   if (error) {
     return (
       <Container sx={{ py: 4 }}>
-        <Typography color="error" textAlign="center">{error}</Typography>
+        <ApiErrorDisplay error={error} title={i18n.t('errorFetchingNewVideosTitle')} />
       </Container>
     );
   }
